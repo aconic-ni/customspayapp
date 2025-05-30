@@ -144,12 +144,7 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps)
             </div>
           </div>
            {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="text-xs text-muted-foreground">
-            Para solicitar acceso, contacte a Coordinación ACONIC: <br />
-            <Link href="https://wa.me/+50583956505" target="_blank" className="text-primary hover:text-primary/80 underline">
-              WhatsApp (+505 8395 6505)
-            </Link>
-          </div>
+          {/* Removed contact information div below */}
           <DialogFooter>
             <Button type="submit" className="btn-primary text-primary-foreground px-8 py-3 rounded-md font-medium w-full" disabled={loading}>
               {loading ? 'Ingresando...' : 'Ingresar'}
