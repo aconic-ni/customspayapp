@@ -1,10 +1,12 @@
+
 // This file was previously /src/app/database/Solicitud/[id]/page.tsx
 // It is now the Client Component part.
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation'; // Corrected from next/router for App Router
 import Image from 'next/image';
-import { useAppContext } from '@/context/AppContext';
+// Removed useAppContext as it's not directly used here for context data fetching, only for types
+// import { useAppContext } from '@/context/AppContext';
 import type { SolicitudData, InitialDataContext, SolicitudRecord } from '@/types';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
@@ -52,12 +54,12 @@ const CheckboxDetailItem: React.FC<{ label: string; checked?: boolean; subLabel?
 
 interface ClientPageProps {
   id: string; // Receive id as a prop
+  onBackToList?: () => void; // For inline view navigation
+  isInlineView?: boolean; // To conditionally render parts like header
 }
 
-export default function ClientPage({ id: solicitudIdFromProp }: ClientPageProps) {
+export default function ClientPage({ id: solicitudIdFromProp, onBackToList, isInlineView = false }: ClientPageProps) {
   const router = useRouter();
-  // const { initialContextData: contextInitialData, solicitudes: contextSolicitudes } = useAppContext(); // Context might not be relevant here
-
   const [displayInitialData, setDisplayInitialData] = useState<InitialDataContext | null>(null);
   const [displaySolicitud, setDisplaySolicitud] = useState<SolicitudData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,7 +74,7 @@ export default function ClientPage({ id: solicitudIdFromProp }: ClientPageProps)
     if (!isClient || !solicitudIdFromProp) {
       if (isClient && !solicitudIdFromProp) {
          toast({ title: "Error", description: "ID de solicitud no válido.", variant: "destructive" });
-         router.push('/database');
+         if (onBackToList) onBackToList(); else router.push('/database');
       }
       if (!solicitudIdFromProp) setLoading(false);
       return;
@@ -148,12 +150,20 @@ export default function ClientPage({ id: solicitudIdFromProp }: ClientPageProps)
 
     loadData();
 
-  }, [solicitudIdFromProp, router, toast, isClient]);
+  }, [solicitudIdFromProp, router, toast, isClient, onBackToList]);
 
 
   const handlePrint = () => {
     console.log("Imprimir button clicked. Attempting to call window.print().");
     window.print();
+  };
+
+  const handleGoBack = () => {
+    if (onBackToList) {
+      onBackToList();
+    } else {
+      router.back();
+    }
   };
 
   const formatCurrency = (amount?: number | string, currency?: string) => {
@@ -182,47 +192,50 @@ export default function ClientPage({ id: solicitudIdFromProp }: ClientPageProps)
 
 
   if (loading || !isClient) {
+    const ShellComponent = isInlineView ? React.Fragment : AppShell;
     return (
-      <AppShell>
-        <div className="min-h-screen flex items-center justify-center grid-bg">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-           <p className="ml-3 text-white">Cargando detalle de la solicitud...</p>
+      <ShellComponent>
+        <div className={cn("flex items-center justify-center", isInlineView ? "py-10" : "min-h-screen grid-bg")}>
+          <Loader2 className={cn("h-12 w-12 animate-spin", isInlineView ? "text-primary" : "text-white")} />
+           <p className={cn("ml-3", isInlineView ? "text-foreground" : "text-white")}>Cargando detalle de la solicitud...</p>
         </div>
-      </AppShell>
+      </ShellComponent>
     );
   }
 
   if (!displaySolicitud || !displayInitialData) {
+     const ShellComponent = isInlineView ? React.Fragment : AppShell;
     return (
-      <AppShell>
+      <ShellComponent>
         <div className="flex flex-col items-center justify-center h-screen text-center">
           <p className="text-xl mb-4">Solicitud no encontrada o datos no disponibles.</p>
-          <Button onClick={() => router.push('/database')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Base de Datos
+          <Button onClick={handleGoBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Volver
           </Button>
         </div>
-      </AppShell>
+      </ShellComponent>
     );
   }
-
-  return (
-    <AppShell>
-      <div className="solicitud-detail-print-area py-2 md:py-5">
+  
+  const content = (
+    <div className="solicitud-detail-print-area py-0 md:py-2"> {/* Adjusted padding for inline view */}
         <Card className="w-full max-w-4xl mx-auto custom-shadow card-print-styles">
-          <CardHeader className="no-print">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-xl md:text-2xl font-semibold text-foreground">Detalle de Solicitud</CardTitle>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => router.back()}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Volver
-                </Button>
-                <Button variant="outline" onClick={handlePrint}>
-                  <Printer className="mr-2 h-4 w-4" /> Imprimir
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
+          {!isInlineView && (
+             <CardHeader className="no-print">
+                <div className="flex justify-between items-center">
+                <CardTitle className="text-xl md:text-2xl font-semibold text-foreground">Detalle de Solicitud</CardTitle>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleGoBack}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+                    </Button>
+                    <Button variant="outline" onClick={handlePrint}>
+                    <Printer className="mr-2 h-4 w-4" /> Imprimir
+                    </Button>
+                </div>
+                </div>
+            </CardHeader>
+          )}
+          <CardContent className={cn(isInlineView ? "pt-4" : "pt-6")}>
             <Image
                 src="/imagenes/HEADERSOLICITUDDETAIL.svg"
                 alt="Header Solicitud Detail"
@@ -234,12 +247,12 @@ export default function ClientPage({ id: solicitudIdFromProp }: ClientPageProps)
 
             <div className="mb-3 p-4 border border-border rounded-md bg-secondary/5 card-print-styles">
                 <div className="grid grid-cols-[auto,1fr] gap-x-3 items-center">
-                    <Label htmlFor="solicitudIdDisplay" className="flex items-center text-sm text-muted-foreground">
+                    <Label htmlFor={`solicitudIdDisplay-${solicitudIdFromProp}`} className="flex items-center text-sm text-muted-foreground">
                         <Info className="mr-2 h-4 w-4 text-primary/70" />
                         ID de Solicitud
                     </Label>
                     <Input
-                        id="solicitudIdDisplay"
+                        id={`solicitudIdDisplay-${solicitudIdFromProp}`}
                         value={displaySolicitud.id}
                         readOnly
                         disabled
@@ -358,18 +371,24 @@ export default function ClientPage({ id: solicitudIdFromProp }: ClientPageProps)
                 className="w-full h-auto object-contain mt-6"
                 data-ai-hint="company seal official"
               />
-
-            <div className="mt-8 flex justify-end space-x-3 no-print">
-                <Button variant="outline" onClick={() => router.back()}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Volver
-                </Button>
-                <Button onClick={handlePrint}>
-                  <Printer className="mr-2 h-4 w-4" /> Imprimir
-                </Button>
-            </div>
+            
+            {/* Render bottom buttons only if not inline or if inline and onBackToList is provided */}
+            {(!isInlineView || (isInlineView && onBackToList)) && (
+                <div className="mt-8 flex justify-end space-x-3 no-print">
+                    <Button variant="outline" onClick={handleGoBack}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+                    </Button>
+                    <Button onClick={handlePrint}>
+                    <Printer className="mr-2 h-4 w-4" /> Imprimir
+                    </Button>
+                </div>
+            )}
           </CardContent>
         </Card>
       </div>
-    </AppShell>
   );
+
+  return isInlineView ? content : <AppShell>{content}</AppShell>;
+
 }
+

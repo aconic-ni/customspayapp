@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, User, FileText as FileTextIcon } from 'lucide-react';
+import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, User, FileText as FileTextIcon, ListCollapse, ArrowLeft } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, or } from 'firebase/firestore';
 import type { SolicitudRecord } from '@/types';
@@ -43,7 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
-
+import ClientPage from './Solicitud/[id]/ClientPage'; // Importar ClientPage
 
 type SearchType = "ne" | "solicitudId" | "manager" | "dateToday" | "dateSpecific" | "dateRange";
 
@@ -65,7 +65,7 @@ interface SearchResultsTableProps {
   currentUserRole?: string;
   onUpdatePaymentStatus: (solicitudId: string, status: string | null, message?: string) => Promise<void>;
   onOpenMessageDialog: (solicitudId: string) => void;
-  router: ReturnType<typeof useRouter>;
+  onViewDetails: (solicitud: SolicitudRecord) => void; // Cambiado para vista en línea
   filterSolicitudIdInput: string;
   setFilterSolicitudIdInput: (value: string) => void;
   filterNEInput: string;
@@ -93,7 +93,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   currentUserRole,
   onUpdatePaymentStatus,
   onOpenMessageDialog,
-  router,
+  onViewDetails, // Usar esta prop
   filterSolicitudIdInput,
   setFilterSolicitudIdInput,
   filterNEInput,
@@ -230,7 +230,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   Guardado Por
                   <Input
                     type="text"
-                    type="text"
                     placeholder="Filtrar Guardado Por..."
                     value={filterGuardadoPorInput}
                     onChange={(e) => setFilterGuardadoPorInput(e.target.value)}
@@ -319,11 +318,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        if (typeof window !== "undefined") {
-                           window.open(`/database/Solicitud/${solicitud.solicitudId}`, '_blank');
-                        }
-                      }}
+                      onClick={() => onViewDetails(solicitud)} // Llamar a onViewDetails
                     >
                       <Eye className="mr-2 h-4 w-4" /> Ver
                     </Button>
@@ -370,37 +365,52 @@ export default function DatabasePage() {
   const [filterUsuarioDeInput, setFilterUsuarioDeInput] = useState('');
   const [filterGuardadoPorInput, setFilterGuardadoPorInput] = useState('');
 
+  // State for inline detail view
+  const [solicitudToViewInline, setSolicitudToViewInline] = useState<SolicitudRecord | null>(null);
+  const [isDetailViewVisible, setIsDetailViewVisible] = useState(false);
+
+  const handleViewDetailsInline = (solicitud: SolicitudRecord) => {
+    setSolicitudToViewInline(solicitud);
+    setIsDetailViewVisible(true);
+  };
+
+  const handleBackToTable = () => {
+    setIsDetailViewVisible(false);
+    setSolicitudToViewInline(null);
+  };
+
 
   const displayedSolicitudes = useMemo(() => {
     if (!fetchedSolicitudes) return null;
     let filtered = fetchedSolicitudes;
   
-    const applyFilter = <T>(data: T[], condition: (item: T) => boolean): T[] => {
+    const applyFilter = <T,>(data: T[], condition: (item: T) => boolean): T[] => {
       const result = data.filter(condition);
-      return result.length > 0 ? result : data;
+      return result.length > 0 ? result : data; // Consider if this should be "data" or "[]" when no match. For now, it seems it intends to return original if filter yields nothing.
+                                                // Or, if multiple filters, it should chain. If one filter yields [], subsequent filters work on [].
     };
   
     if (filterSolicitudIdInput) {
-      filtered = applyFilter(filtered, s =>
+      filtered = filtered.filter(s =>
         s.solicitudId.toLowerCase().includes(filterSolicitudIdInput.toLowerCase())
       );
     }
   
     if (filterNEInput) {
-      filtered = applyFilter(filtered, s =>
+      filtered = filtered.filter(s =>
         s.examNe.toLowerCase().includes(filterNEInput.toLowerCase())
       );
     }
   
     if (filterEstadoPagoInput) {
-      filtered = applyFilter(filtered, s => {
+      filtered = filtered.filter(s => {
         const statusText = s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente";
         return statusText.includes(filterEstadoPagoInput.toLowerCase());
       });
     }
   
     if (filterFechaSolicitudInput) {
-      filtered = applyFilter(filtered, s => {
+      filtered = filtered.filter(s => {
         const dateText = s.examDate instanceof FirestoreTimestamp
           ? format(s.examDate.toDate(), "PPP", { locale: es })
           : (s.examDate instanceof Date ? format(s.examDate, "PPP", { locale: es }) : 'N/A');
@@ -409,33 +419,37 @@ export default function DatabasePage() {
     }
   
     if (filterMontoInput) {
-      filtered = applyFilter(filtered, s => {
+      filtered = filtered.filter(s => {
         const montoText = formatCurrencyFetched(s.monto, s.montoMoneda);
         return montoText.toLowerCase().includes(filterMontoInput.toLowerCase());
       });
     }
   
     if (filterConsignatarioInput) {
-      filtered = applyFilter(filtered, s =>
+      filtered = filtered.filter(s =>
         (s.consignatario || '').toLowerCase().includes(filterConsignatarioInput.toLowerCase())
       );
     }
   
     if (filterDeclaracionInput) {
-      filtered = applyFilter(filtered, s =>
+      filtered = filtered.filter(s =>
         (s.declaracionNumero || '').toLowerCase().includes(filterDeclaracionInput.toLowerCase())
       );
     }
   
     if (filterUsuarioDeInput) {
-      filtered = applyFilter(filtered, s =>
+      filtered = filtered.filter(s =>
         (s.examManager || '').toLowerCase().includes(filterUsuarioDeInput.toLowerCase())
       );
     }
   
-    if (filterGuardadoPorInput) {
-      filtered = applyFilter(filtered, s =>
+    if (filterGuardadoPorInput && user?.role !== 'autorevisor') { // Autorevisor has this field locked
+      filtered = filtered.filter(s =>
         (s.savedBy || '').toLowerCase().includes(filterGuardadoPorInput.toLowerCase())
+      );
+    } else if (user?.role === 'autorevisor' && user.email) { // Autorevisor always filters by their own email for 'Guardado Por'
+        filtered = filtered.filter(s =>
+        (s.savedBy || '').toLowerCase() === user.email!.toLowerCase()
       );
     }
   
@@ -450,7 +464,9 @@ export default function DatabasePage() {
     filterConsignatarioInput,
     filterDeclaracionInput,
     filterUsuarioDeInput,
-    filterGuardadoPorInput
+    filterGuardadoPorInput,
+    user?.role, // Add user role and email to dependency array
+    user?.email
   ]);
   
 
@@ -534,13 +550,13 @@ export default function DatabasePage() {
     if (isClient && !authLoading) {
       const isAutorevisor = user?.role === 'autorevisor';
       const isAuthorized = user && (user.isStaticUser || user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
-      if (!isAuthorized) {
+      if (!isAuthorized && !isDetailViewVisible) { // Don't redirect if detail view is visible (might be from a direct link initially)
         if (!fetchedSolicitudes) { 
           router.push('/');
         }
       }
     }
-  }, [user, authLoading, router, isClient, fetchedSolicitudes]);
+  }, [user, authLoading, router, isClient, fetchedSolicitudes, isDetailViewVisible]);
 
   useEffect(() => {
     if (isClient && !authLoading && user?.role === 'autorevisor' && user?.email) {
@@ -554,6 +570,9 @@ export default function DatabasePage() {
     setError(null);
     setFetchedSolicitudes(null);
     setCurrentSearchTermForDisplay('');
+    setIsDetailViewVisible(false); // Hide detail view on new search
+    setSolicitudToViewInline(null);
+
     // Reset column filters on new search
     setFilterSolicitudIdInput('');
     setFilterNEInput('');
@@ -780,8 +799,23 @@ export default function DatabasePage() {
     }
   };
 
-  if (!isClient || (authLoading && !fetchedSolicitudes)) {
+  if (!isClient || (authLoading && !fetchedSolicitudes && !isDetailViewVisible)) {
     return <div className="min-h-screen flex items-center justify-center grid-bg"><Loader2 className="h-12 w-12 animate-spin text-white" /></div>;
+  }
+
+  if (isDetailViewVisible && solicitudToViewInline) {
+    return (
+      <AppShell>
+        <div className="py-2 md:py-5">
+          <div className="mb-4">
+             <Button onClick={handleBackToTable} variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Búsqueda
+             </Button>
+          </div>
+          <ClientPage id={solicitudToViewInline.solicitudId} onBackToList={handleBackToTable} isInlineView={true} />
+        </div>
+      </AppShell>
+    );
   }
 
   return (
@@ -821,7 +855,7 @@ export default function DatabasePage() {
                 currentUserRole={user?.role} 
                 onUpdatePaymentStatus={handleUpdatePaymentStatus} 
                 onOpenMessageDialog={openMessageDialog}
-                router={router}
+                onViewDetails={handleViewDetailsInline}
                 filterSolicitudIdInput={filterSolicitudIdInput}
                 setFilterSolicitudIdInput={setFilterSolicitudIdInput}
                 filterNEInput={filterNEInput}
@@ -875,7 +909,3 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
-
-    
-
-    
