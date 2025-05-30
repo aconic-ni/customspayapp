@@ -26,7 +26,7 @@ export default function HomePage() {
       let targetPath = '/examiner'; // Default
       if (user.role === 'autorevisor') {
         targetPath = '/examiner';
-      } else if (user.role === 'revisor' || user.role === 'calificador') { // Eliminada la condición user.isStaticUser
+      } else if (user.role === 'revisor' || user.role === 'calificador') {
         targetPath = '/database';
       }
       if (pathname !== targetPath) {
@@ -84,7 +84,7 @@ export default function HomePage() {
       </main>
 
       <footer className="absolute bottom-8 text-center text-sm text-blue-300">
-        Stvaer © 2025 <em className="italic">for</em> ACONIC.
+        Stvaer © 2025 <em className="italic">for</em> ACONIC
       </footer>
 
       <LoginModal
