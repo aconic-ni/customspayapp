@@ -27,7 +27,7 @@ const DetailItem: React.FC<{ label: string; value?: string | number | null | boo
   let displayValue: string;
   if (typeof value === 'boolean') {
     displayValue = value ? 'Sí' : 'No';
-  } else if (value instanceof Date) {
+  } else if (value && value instanceof Date) { // Check if value is not null/undefined before instanceof
     displayValue = format(value, "PPP", { locale: es });
   } else {
     displayValue = String(value ?? 'N/A');
@@ -93,7 +93,7 @@ export default function ClientPage({ id: solicitudIdFromProp, onBackToList, isIn
             ne: record.examNe,
             reference: record.examReference || '',
             manager: record.examManager,
-            date: record.examDate instanceof FirestoreTimestamp ? record.examDate.toDate() : new Date(record.examDate),
+            date: record.examDate && typeof record.examDate === 'object' && 'toDate' in record.examDate ? (record.examDate as FirestoreTimestamp).toDate() : new Date(record.examDate as any),
             recipient: record.examRecipient,
           };
           setDisplayInitialData(fetchedInitialData);
@@ -266,7 +266,7 @@ export default function ClientPage({ id: solicitudIdFromProp, onBackToList, isIn
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-0">
                   <DetailItem label="A" value={displayInitialData.recipient} icon={Send} />
                   <DetailItem label="De (Usuario)" value={displayInitialData.manager} icon={User} />
-                  <DetailItem label="Fecha de Solicitud" value={displayInitialData.date ? format(new Date(displayInitialData.date), "PPP", { locale: es }) : 'N/A'} icon={CalendarDays} />
+                  <DetailItem label="Fecha de Solicitud" value={displayInitialData.date && displayInitialData.date instanceof Date ? format(new Date(displayInitialData.date), "PPP", { locale: es }) : 'N/A'} icon={CalendarDays} />
                   <DetailItem label="NE (Tracking NX1)" value={displayInitialData.ne} icon={Info} />
                   <DetailItem label="Referencia" value={displayInitialData.reference || 'N/A'} icon={FileText} className="md:col-span-2"/>
                 </div>
@@ -391,4 +391,3 @@ export default function ClientPage({ id: solicitudIdFromProp, onBackToList, isIn
   return isInlineView ? content : <AppShell>{content}</AppShell>;
 
 }
-

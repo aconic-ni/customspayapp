@@ -12,7 +12,7 @@ export function AppHeader() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const isDatabaseAuthorized = user && (user.isStaticUser || user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
+  const isDatabaseAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
 
   const renderAppIdentity = () => (
     <>

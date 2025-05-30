@@ -5,15 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useAppContext, SolicitudStep } from '@/context/AppContext';
 import { downloadTxtFile, downloadDetailedExcelFile } from '@/lib/fileExporter';
 import type { SolicitudData, InitialDataContext } from '@/types';
-import { Download, Check, ArrowLeft, FileType, User, Landmark, FileText, Banknote, Hash, Users, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, CheckSquare, Square, Settings2 } from 'lucide-react';
+import { Download, Check, ArrowLeft, User, Landmark, FileText, Banknote, Hash, Users, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, CheckSquare, Square, Settings2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-// PDF Download is commented out due to unresolved errors
-// import dynamic from 'next/dynamic';
-// const DynamicClientPDFDownload = dynamic(() => import('@/components/pdf/ClientPDFDownload').then(mod => mod.ClientPDFDownload), { ssr: false, loading: () => <Button variant="outline" disabled><FileType className="mr-2 h-4 w-4" /> Cargando PDF...</Button> });
+// PDF Download is removed
 
 
 const PreviewDetailItem: React.FC<{ label: string; value?: string | number | null | boolean, icon?: React.ElementType, className?: string }> = ({ label, value, icon: Icon, className }) => {
@@ -116,7 +114,7 @@ export function PreviewScreen() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-secondary/30 p-4 rounded-md shadow-sm text-sm">
             <PreviewDetailItem label="A (Destinatario)" value={initialContextData.recipient} icon={Send} />
             <PreviewDetailItem label="De (Usuario)" value={initialContextData.manager} icon={User} />
-            <PreviewDetailItem label="Fecha de Solicitud" value={initialContextData.date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'N/A'} icon={CalendarDays} />
+            <PreviewDetailItem label="Fecha de Solicitud" value={initialContextData.date && initialContextData.date instanceof Date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'N/A'} icon={CalendarDays} />
             <PreviewDetailItem label="NE (Tracking NX1)" value={initialContextData.ne} icon={Info} />
             <PreviewDetailItem label="Referencia" value={initialContextData.reference || 'N/A'} icon={FileText} />
           </div>
@@ -251,7 +249,6 @@ export function PreviewScreen() {
                 <Button variant="outline" onClick={handleDownloadExcel} className="hover:bg-accent/50 w-full sm:w-auto">
                     <Download className="mr-2 h-4 w-4" /> Descargar Excel
                 </Button>
-                {/* <DynamicClientPDFDownload examData={initialContextData} solicitudes={solicitudes} className="w-full sm:w-auto"/> */}
                 <Button onClick={handleConfirm} className="btn-primary w-full sm:w-auto">
                     <Check className="mr-2 h-4 w-4" /> Confirmar Solicitud
                 </Button>

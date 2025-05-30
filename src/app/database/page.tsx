@@ -47,7 +47,7 @@ import ClientPage from './Solicitud/[id]/ClientPage'; // Importar ClientPage
 
 type SearchType = "ne" | "solicitudId" | "manager" | "dateToday" | "dateSpecific" | "dateRange" | "dateCurrentMonth";
 
-const formatCurrencyFetched = (amount?: number | string, currency?: string) => {
+const formatCurrencyFetched = (amount?: number | string | null, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
     const num = Number(amount);
     if (isNaN(num)) return String(amount);
@@ -296,7 +296,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                               <TooltipContent className="text-xs">
                                 <p>Última actualización:</p>
                                 {solicitud.paymentStatusLastUpdatedBy && <p>Por: {solicitud.paymentStatusLastUpdatedBy}</p>}
-                                {solicitud.paymentStatusLastUpdatedAt && <p>Fecha: {format(solicitud.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? solicitud.paymentStatusLastUpdatedAt.toDate() : solicitud.paymentStatusLastUpdatedAt, "Pp", { locale: es })}</p>}
+                                {solicitud.paymentStatusLastUpdatedAt && solicitud.paymentStatusLastUpdatedAt instanceof Date && <p>Fecha: {format(solicitud.paymentStatusLastUpdatedAt, "Pp", { locale: es })}</p>}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -306,12 +306,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{solicitud.solicitudId}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                    {solicitud.examDate instanceof FirestoreTimestamp
-                      ? format(solicitud.examDate.toDate(), "PPP", { locale: es })
-                      : (solicitud.examDate instanceof Date ? format(solicitud.examDate, "PPP", { locale: es }) : 'N/A')}
+                    {solicitud.examDate instanceof Date
+                      ? format(solicitud.examDate, "PPP", { locale: es })
+                      : 'N/A'}
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examNe}</TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{formatCurrencyFetched(solicitud.monto, solicitud.montoMoneda)}</TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{formatCurrencyFetched(solicitud.monto, solicitud.montoMoneda || undefined)}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.consignatario || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.declaracionNumero || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examManager}</TableCell>
@@ -405,16 +405,16 @@ export default function DatabasePage() {
   
     if (filterFechaSolicitudInput) {
       filtered = filtered.filter(s => {
-        const dateText = s.examDate instanceof FirestoreTimestamp
-          ? format(s.examDate.toDate(), "PPP", { locale: es })
-          : (s.examDate instanceof Date ? format(s.examDate, "PPP", { locale: es }) : 'N/A');
+        const dateText = s.examDate instanceof Date
+          ? format(s.examDate, "PPP", { locale: es })
+          : 'N/A';
         return dateText.toLowerCase().includes(filterFechaSolicitudInput.toLowerCase());
       });
     }
   
     if (filterMontoInput) {
       filtered = filtered.filter(s => {
-        const montoText = formatCurrencyFetched(s.monto, s.montoMoneda);
+        const montoText = formatCurrencyFetched(s.monto, s.montoMoneda || undefined);
         return montoText.toLowerCase().includes(filterMontoInput.toLowerCase());
       });
     }
@@ -636,13 +636,13 @@ export default function DatabasePage() {
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           let data = querySnapshot.docs.map(docSnap => { 
-            const docData = docSnap.data() as Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt'> & { examDate: FirestoreTimestamp | Date, savedAt: FirestoreTimestamp | Date, paymentStatusLastUpdatedAt?: FirestoreTimestamp | Date };
+            const docData = docSnap.data() as Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp };
             return {
               ...docData,
               solicitudId: docSnap.id,
-              examDate: docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : docData.examDate as Date,
-              savedAt: docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : docData.savedAt as Date,
-              paymentStatusLastUpdatedAt: docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt ? docData.paymentStatusLastUpdatedAt as Date : undefined),
+              examDate: docData.examDate && typeof docData.examDate === 'object' && 'toDate' in docData.examDate ? (docData.examDate as FirestoreTimestamp).toDate() : new Date(docData.examDate as any),
+              savedAt: docData.savedAt && typeof docData.savedAt === 'object' && 'toDate' in docData.savedAt ? (docData.savedAt as FirestoreTimestamp).toDate() : new Date(docData.savedAt as any),
+              paymentStatusLastUpdatedAt: docData.paymentStatusLastUpdatedAt && typeof docData.paymentStatusLastUpdatedAt === 'object' && 'toDate' in docData.paymentStatusLastUpdatedAt ? (docData.paymentStatusLastUpdatedAt as FirestoreTimestamp).toDate() : (docData.paymentStatusLastUpdatedAt ? new Date(docData.paymentStatusLastUpdatedAt as any) : undefined),
             } as SolicitudRecord;
           });
           setFetchedSolicitudes(data);
@@ -730,7 +730,7 @@ export default function DatabasePage() {
         "Observación": s.observation || 'N/A',
         "Fecha de Guardado": s.savedAt instanceof Date ? format(s.savedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "Actualizado Por (Pago)": s.paymentStatusLastUpdatedBy || 'N/A',
-        "Fecha Actualización (Pago)": s.paymentStatusLastUpdatedAt ? format(s.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? s.paymentStatusLastUpdatedAt.toDate() : s.paymentStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
+        "Fecha Actualización (Pago)": s.paymentStatusLastUpdatedAt && s.paymentStatusLastUpdatedAt instanceof Date ? format(s.paymentStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
       }));
       downloadExcelFileFromTable(dataToExport, headers, `Reporte_Solicitudes_${searchType}_${currentSearchTermForDisplay.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
     } else { toast({ title: "Sin Datos", description: "No hay datos para exportar. Realice una búsqueda primero.", variant: "default"}); }

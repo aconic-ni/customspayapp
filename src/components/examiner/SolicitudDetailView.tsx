@@ -17,7 +17,7 @@ const DetailItem: React.FC<{ label: string; value?: string | number | null | boo
   let displayValue: string;
   if (typeof value === 'boolean') {
     displayValue = value ? 'Sí' : 'No';
-  } else if (value instanceof Date) {
+  } else if (value && value instanceof Date) { // Check if value is not null/undefined before instanceof
     displayValue = format(value, "PPP", { locale: es });
   } else {
     displayValue = String(value ?? 'N/A');
@@ -79,14 +79,14 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
     return s.monedaCuenta;
   };
 
-  if (!solicitud || !initialData) {
+  if (!solicitud || !initialData || !(initialData.date instanceof Date)) {
     return (
       <Card className="w-full custom-shadow">
         <CardHeader>
           <CardTitle className="text-xl md:text-2xl font-semibold text-foreground">Detalle de Solicitud</CardTitle>
         </CardHeader>
         <CardContent>
-          <p>No se pudo cargar la información de la solicitud.</p>
+          <p>No se pudo cargar la información de la solicitud o la fecha es inválida.</p>
           <Button onClick={onBackToList} variant="outline" className="mt-4">
             <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Lista de Solicitudes
           </Button>

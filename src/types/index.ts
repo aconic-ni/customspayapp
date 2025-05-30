@@ -6,14 +6,14 @@ export interface InitialDataContext {
   ne: string;
   reference: string;
   manager: string; // "De (Nombre Usuario)"
-  date: Date;
+  date: Date; // Should always be a Date object in the context
   recipient: string; // "A:"
 }
 
 export interface SolicitudData {
   id: string;
 
-  monto?: number | string;
+  monto?: number | string; // Could be string from form input, number after parsing
   montoMoneda?: 'cordoba' | 'dolar' | 'euro' | string;
   cantidadEnLetras?: string;
 
@@ -61,7 +61,6 @@ export interface AppUser {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  // isStaticUser?: boolean; // Eliminado
   role?: 'revisor' | 'calificador' | 'autorevisor' | string;
 }
 
@@ -71,7 +70,7 @@ export interface SolicitudRecord {
   examNe: string;
   examReference: string | null;
   examManager: string; // Represents the user who created the solicitud // Labeled "De (Usuario)"
-  examDate: Timestamp; // Firestore Timestamp
+  examDate: Timestamp | Date; // Can be Firestore Timestamp or Date object after fetching
   examRecipient: string;
 
   // All fields from the specific SolicitudData being saved
@@ -120,7 +119,7 @@ export interface SolicitudRecord {
   observation: string | null;
 
   // Metadata
-  savedAt: Timestamp; // Firestore Timestamp
+  savedAt: Timestamp | Date; // Can be Firestore Timestamp or Date object after fetching
   savedBy: string | null; // User's email
 
   // New fields for payment status

@@ -82,7 +82,7 @@ export function AddProductModal() {
   const form = useForm<SolicitudFormData>({
     resolver: zodResolver(solicitudSchema),
     defaultValues: {
-      monto: undefined,
+      monto: undefined, // Explicitly undefined
       montoMoneda: 'cordoba',
       cantidadEnLetras: '',
       consignatario: '',
@@ -126,8 +126,9 @@ export function AddProductModal() {
   const watchedPagoServicios = form.watch("pagoServicios");
   const watchedTipoServicio = form.watch("tipoServicio");
 
-  const sanitizeMontoInput = (inputValue: string): string => {
-    let value = inputValue;
+  const sanitizeMontoInput = (inputValue: string | number | undefined): string => {
+    if (inputValue === undefined || inputValue === null) return '';
+    let value = String(inputValue); // Ensure it's a string
     value = value.replace(/[^\d.]/g, "");
 
     const dotIndex = value.indexOf('.');
@@ -149,13 +150,12 @@ export function AddProductModal() {
 
   useEffect(() => {
     let montoForConversion: number | undefined = undefined;
-    if (typeof watchedMonto === 'string') {
-      const parsed = parseFloat(watchedMonto.replace(/,/g, ''));
-      if (!isNaN(parsed)) {
-        montoForConversion = parsed;
-      }
-    } else if (typeof watchedMonto === 'number') {
-      montoForConversion = watchedMonto;
+    if (watchedMonto !== undefined) {
+        const montoStr = String(watchedMonto); // Ensure watchedMonto is treated as a string for replacement
+        const parsed = parseFloat(montoStr.replace(/,/g, ''));
+        if (!isNaN(parsed)) {
+            montoForConversion = parsed;
+        }
     }
 
     if (montoForConversion !== undefined && watchedMontoMoneda) {
@@ -233,18 +233,18 @@ export function AddProductModal() {
       setSelectedAccountName(null); 
 
       if (editingSolicitud) {
-        const montoAsString = editingSolicitud.monto !== undefined && editingSolicitud.monto !== null
+        const montoAsStringOrUndefined = editingSolicitud.monto !== undefined && editingSolicitud.monto !== null
           ? String(editingSolicitud.monto)
-          : '';
+          : undefined; // Ensure it's undefined if monto is not set
 
         const populatedEditingSolicitud: SolicitudFormData = {
           ...initialValues, 
           ...editingSolicitud, 
-          monto: montoAsString, 
+          monto: montoAsStringOrUndefined, 
           correo: editingSolicitud.correo || defaultCorreo, 
           soporte: editingSolicitud.soporte ?? false, 
           pagoServicios: editingSolicitud.pagoServicios ?? false,
-          tipoServicio: editingSolicitud.tipoServicio || undefined,
+          tipoServicio: editingSolicitud.tipoServicio as SolicitudFormData['tipoServicio'] || undefined,
           otrosTipoServicio: editingSolicitud.otrosTipoServicio || '',
           facturaServicio: editingSolicitud.facturaServicio || '',
           institucionServicio: editingSolicitud.institucionServicio || '',
@@ -288,21 +288,29 @@ export function AddProductModal() {
     }
   };
 
-  function onSubmit(data: SolicitudFormData) {
-    const solicitudDataToSave = {
-      ...data,
-      monto: data.monto !== undefined ? parseFloat(String(data.monto).replace(/,/g, '')) : undefined,
-      soporte: data.soporte ?? false,
-      pagoServicios: data.pagoServicios ?? false,
+function onSubmit(data: SolicitudFormData) {
+    const sanitizedMonto = data.monto !== undefined && data.monto !== null ? parseFloat(String(data.monto).replace(/,/g, '')) : undefined;
+
+    if (sanitizedMonto === undefined || isNaN(sanitizedMonto)) {
+        form.setError("monto", { type: "manual", message: "Monto es requerido y debe ser un número válido." });
+        return;
+    }
+
+    const solicitudDataToSave: Omit<SolicitudData, 'id'> & { id?: string } = {
+        ...data,
+        monto: sanitizedMonto,
+        soporte: data.soporte ?? false,
+        pagoServicios: data.pagoServicios ?? false,
+        tipoServicio: data.tipoServicio as SolicitudData['tipoServicio'], // Cast to ensure type compatibility
     };
 
     if (editingSolicitud && editingSolicitud.id) {
-      updateSolicitud({ ...solicitudDataToSave, id: editingSolicitud.id } as SolicitudData);
+        updateSolicitud({ ...solicitudDataToSave, id: editingSolicitud.id } as SolicitudData);
     } else {
-      addSolicitud(solicitudDataToSave as Omit<SolicitudData, 'id'>);
+        addSolicitud(solicitudDataToSave as Omit<SolicitudData, 'id'>);
     }
     closeAddProductModal();
-  }
+}
 
   if (!isAddProductModalOpen) return null;
 
@@ -677,7 +685,10 @@ export function AddProductModal() {
                       <FormField control={form.control} name="tipoServicio" render={({ field: selectField }) => (
                         <FormItem className={showOtrosTipoServicio ? 'md:col-span-1' : 'md:col-span-2'}>
                           <FormLabel className="flex items-center text-foreground"><Package className="mr-2 h-4 w-4 text-primary" />Tipo</FormLabel>
-                          <Select onValueChange={selectField.onChange} value={selectField.value}>
+                          <Select 
+                            onValueChange={(value) => selectField.onChange(value as SolicitudFormData['tipoServicio'])} 
+                            value={selectField.value}
+                          >
                             <FormControl><SelectTrigger><SelectValue placeholder="Seleccione tipo de servicio" /></SelectTrigger></FormControl>
                             <SelectContent>
                               <SelectItem value="COMIECO">COMIECO</SelectItem>
@@ -763,5 +774,3 @@ export function AddProductModal() {
     </Dialog>
   );
 }
-
-    

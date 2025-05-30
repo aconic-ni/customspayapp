@@ -22,7 +22,7 @@ const DetailItem: React.FC<{ label: string; value?: string | number | null | boo
   let displayValue: string;
   if (typeof value === 'boolean') {
     displayValue = value ? 'Sí' : 'No';
-  } else if (value instanceof Date) {
+  } else if (value && value instanceof Date) { // Check if value is not null/undefined before instanceof
     displayValue = format(value, "PPP", { locale: es });
   } else {
     displayValue = String(value ?? 'N/A');
@@ -79,11 +79,16 @@ export default function SolicitudDetailPage() {
       setLoading(true);
       let foundInContext = false;
 
-      if (contextInitialData && contextSolicitudes && contextSolicitudes.length > 0) {
+      if (contextInitialData && contextInitialData.date && contextSolicitudes && contextSolicitudes.length > 0) {
         const found = contextSolicitudes.find(s => s.id === solicitudId);
         if (found) {
           setDisplaySolicitud(found);
-          setDisplayInitialData(contextInitialData);
+          // Ensure contextInitialData.date is a Date object
+          const ensuredDateInitialData: InitialDataContext = {
+            ...contextInitialData,
+            date: contextInitialData.date instanceof Date ? contextInitialData.date : new Date(contextInitialData.date),
+          };
+          setDisplayInitialData(ensuredDateInitialData);
           foundInContext = true;
         }
       }
@@ -95,12 +100,12 @@ export default function SolicitudDetailPage() {
 
           if (docSnap.exists()) {
             const record = docSnap.data() as SolicitudRecord;
-
+            
             const fetchedInitialData: InitialDataContext = {
               ne: record.examNe,
               reference: record.examReference || '',
               manager: record.examManager,
-              date: record.examDate instanceof FirestoreTimestamp ? record.examDate.toDate() : new Date(record.examDate),
+              date: record.examDate && typeof record.examDate === 'object' && 'toDate' in record.examDate ? (record.examDate as FirestoreTimestamp).toDate() : new Date(record.examDate as any),
               recipient: record.examRecipient,
             };
             setDisplayInitialData(fetchedInitialData);
@@ -201,11 +206,11 @@ export default function SolicitudDetailPage() {
     );
   }
 
-  if (!displaySolicitud || !displayInitialData) {
+  if (!displaySolicitud || !displayInitialData || !(displayInitialData.date instanceof Date)) {
     return (
       <AppShell>
         <div className="flex flex-col items-center justify-center h-screen text-center">
-          <p className="text-xl mb-4">Solicitud no encontrada o datos no disponibles.</p>
+          <p className="text-xl mb-4">Solicitud no encontrada, datos no disponibles o fecha inválida.</p>
           <Button onClick={() => router.push('/examiner')}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Volver
           </Button>
