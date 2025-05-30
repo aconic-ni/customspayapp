@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, or } from 'firebase/firestore';
 import type { SolicitudRecord } from '@/types';
 import { downloadExcelFileFromTable } from '@/lib/fileExporter';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   Table,
@@ -45,7 +45,7 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import ClientPage from './Solicitud/[id]/ClientPage'; // Importar ClientPage
 
-type SearchType = "ne" | "solicitudId" | "manager" | "dateToday" | "dateSpecific" | "dateRange";
+type SearchType = "ne" | "solicitudId" | "manager" | "dateToday" | "dateSpecific" | "dateRange" | "dateCurrentMonth";
 
 const formatCurrencyFetched = (amount?: number | string, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
@@ -122,6 +122,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
     else if (searchType === "solicitudId" && searchTerm) message = `No se encontró la solicitud con ID: ${searchTerm}`;
     else if (searchType === "manager" && searchTerm) message = `No se encontraron solicitudes para el Usuario (Guardado Por): ${searchTerm}`;
     else if (searchType === "dateToday") message = "No se encontraron solicitudes para hoy."
+    else if (searchType === "dateCurrentMonth") message = `No se encontraron solicitudes para ${searchTerm}.`
     return <p className="text-muted-foreground text-center py-4">{message}</p>;
   }
 
@@ -130,6 +131,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
     if (searchType === "solicitudId" && solicitudes.length > 0) return `Detalle Solicitud ID: ${solicitudes[0].solicitudId}`;
     if (searchType === "manager" && searchTerm) return `Solicitudes del Usuario (Guardado Por): ${searchTerm}`;
     if (searchType === "dateToday") return `Solicitudes de Hoy (${format(new Date(), "PPP", { locale: es })})`;
+    if (searchType === "dateCurrentMonth") return `Solicitudes de ${searchTerm}`;
     if (searchType === "dateSpecific" && searchTerm) return `Solicitudes del ${searchTerm}`;
     if (searchType === "dateRange" && searchTerm) return `Solicitudes para el rango: ${searchTerm}`;
     return "Solicitudes Encontradas";
@@ -602,6 +604,16 @@ export default function DatabasePage() {
           );
           termForDisplay = format(new Date(), "PPP", { locale: es });
           break;
+        case "dateCurrentMonth":
+          const currentMonthStart = startOfMonth(new Date());
+          const currentMonthEnd = endOfMonth(new Date());
+          q = query(solicitudsCollectionRef,
+            where("examDate", ">=", FirestoreTimestamp.fromDate(currentMonthStart)),
+            where("examDate", "<=", FirestoreTimestamp.fromDate(currentMonthEnd)),
+            orderBy("examDate", "desc")
+          );
+          termForDisplay = format(new Date(), "MMMM yyyy", { locale: es });
+          break;
         case "dateSpecific":
           if (!selectedDate) { setError("Por favor, seleccione una fecha específica."); setIsLoading(false); return; }
           const specificDayStart = startOfDay(selectedDate);
@@ -781,6 +793,7 @@ export default function DatabasePage() {
           </div>
         );
       case "dateToday": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes de hoy.</p>;
+      case "dateCurrentMonth": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes del mes actual.</p>;
       case "dateSpecific":
         return (
           <Popover>
@@ -836,6 +849,7 @@ export default function DatabasePage() {
                   <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue placeholder="Tipo de búsqueda" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
+                    <SelectItem value="dateCurrentMonth">Por Fecha (Mes Actual)</SelectItem>
                     <SelectItem value="dateSpecific">Por Fecha (Específica)</SelectItem>
                     <SelectItem value="dateRange">Por Fecha (Rango)</SelectItem>
                   </SelectContent>
