@@ -7,13 +7,12 @@ import { useAppContext } from '@/context/AppContext';
 import type { SolicitudData } from '@/types';
 import { Eye, Edit3, Trash2, MoreHorizontal, FileText, AlertTriangle, Info, CalendarDays } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useRouter } from 'next/navigation';
+// useRouter is no longer needed for the "Ver" action here
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export function ProductTable() {
-  const { initialContextData, solicitudes, openAddProductModal, deleteSolicitud } = useAppContext();
-  const router = useRouter(); 
+  const { initialContextData, solicitudes, openAddProductModal, deleteSolicitud, setSolicitudToViewInline } = useAppContext();
 
   const formatCurrency = (amount?: number | string, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
@@ -94,8 +93,8 @@ export function ProductTable() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => router.push(`/examiner/solicitud/${solicitud.id}`)}>
-                      <Eye className="mr-2 h-4 w-4" /> Ver
+                    <DropdownMenuItem onClick={() => setSolicitudToViewInline(solicitud)}>
+                      <Eye className="mr-2 h-4 w-4" /> Ver Detalle
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => openAddProductModal(solicitud)}>
                       <Edit3 className="mr-2 h-4 w-4" /> Editar

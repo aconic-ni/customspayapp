@@ -4,12 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext, SolicitudStep } from '@/context/AppContext';
 import { ProductTable } from './ProductTable';
-// import { AddProductModal } from './AddProductModal'; // AddProductModal is rendered by ExaminerPage
-import { PlusCircle, CheckCircle, ArrowLeft, Eye, ListCollapse } from 'lucide-react';
+import { PlusCircle, CheckCircle, ArrowLeft, ListCollapse } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
-import SolicitudDetailView from './SolicitudDetailView'; // Placeholder for now
+import SolicitudDetailView from './SolicitudDetailView'; 
 
 export function ProductListScreen() {
   const { 
@@ -17,9 +16,9 @@ export function ProductListScreen() {
     setCurrentStep, 
     openAddProductModal, 
     solicitudes,
-    isDetailViewInlineVisible, // New state from context
-    setIsDetailViewInlineVisible, // New setter from context
-    solicitudToViewInline // New state from context
+    isDetailViewInlineVisible,
+    setIsDetailViewInlineVisible,
+    solicitudToViewInline
   } = useAppContext();
   const { toast } = useToast();
 
@@ -55,23 +54,22 @@ export function ProductListScreen() {
           <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-2 gap-4">
             <CardTitle className="text-xl md:text-2xl font-semibold text-gray-800">SOLICITUDES</CardTitle>
             <div className="flex flex-col sm:flex-row gap-3">
-              {!isDetailViewInlineVisible && (
+              {isDetailViewInlineVisible && solicitudToViewInline ? (
+                 <Button onClick={toggleDetailView} variant="outline">
+                  <ListCollapse className="mr-2 h-5 w-5" /> Ver Lista de Solicitudes
+                </Button>
+              ) : (
                 <Button onClick={() => openAddProductModal()} className="btn-primary">
                   <PlusCircle className="mr-2 h-5 w-5" /> Añadir Nueva Solicitud
                 </Button>
               )}
-              {isDetailViewInlineVisible && solicitudToViewInline && (
-                 <Button onClick={toggleDetailView} variant="outline">
-                  <ListCollapse className="mr-2 h-5 w-5" /> Ver Lista de Solicitudes
-                </Button>
-              )}
-              <Button onClick={handleFinish} className="btn-secondary" disabled={isDetailViewInlineVisible}>
+              <Button onClick={handleFinish} className="btn-secondary" disabled={isDetailViewInlineVisible && !!solicitudToViewInline}>
                 <CheckCircle className="mr-2 h-5 w-5" /> Finalizar y Previsualizar
               </Button>
             </div>
           </div>
         </CardHeader>
-        {!isDetailViewInlineVisible && (
+        {!(isDetailViewInlineVisible && solicitudToViewInline) && (
           <CardContent>
             <div className="mb-6 p-4 bg-secondary/30 border border-border rounded-md shadow">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
@@ -92,7 +90,7 @@ export function ProductListScreen() {
         )}
       </Card>
 
-      {isDetailViewInlineVisible && solicitudToViewInline && (
+      {isDetailViewInlineVisible && solicitudToViewInline && initialContextData && (
         <div className="mt-6"> 
           <SolicitudDetailView 
             solicitud={solicitudToViewInline} 
@@ -101,7 +99,6 @@ export function ProductListScreen() {
           />
         </div>
       )}
-      {/* AddProductModal is rendered at ExaminerPage level */}
     </>
   );
 }

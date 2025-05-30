@@ -103,10 +103,20 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
 
   const deleteSolicitud = useCallback((solicitudId: string) => {
     setSolicitudes((prevSolicitudes) => prevSolicitudes.filter((s) => s.id !== solicitudId));
-  }, []);
+    // If the deleted solicitud was being viewed inline, hide the detail view
+    if (solicitudToViewInline?.id === solicitudId) {
+      setIsDetailViewInlineVisibleState(false);
+      setSolicitudToViewInlineState(null);
+    }
+  }, [solicitudToViewInline]);
 
   const setCurrentStep = useCallback((step: SolicitudStep) => {
     setCurrentStepState(step);
+     // When navigating away from product list, hide inline detail
+    if (step !== SolicitudStep.PRODUCT_LIST) {
+      setIsDetailViewInlineVisibleState(false);
+      setSolicitudToViewInlineState(null);
+    }
   }, []);
 
   const setEditingSolicitud = useCallback((solicitud: SolicitudData | null) => {
@@ -116,6 +126,8 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
   const openAddProductModal = useCallback((solicitudToEdit: SolicitudData | null = null) => {
     setEditingSolicitudState(solicitudToEdit);
     setIsAddProductModalOpen(true);
+    setIsDetailViewInlineVisibleState(false); // Hide detail view when opening modal
+    setSolicitudToViewInlineState(null);
   }, []);
 
   const closeAddProductModal = useCallback(() => {
@@ -126,13 +138,13 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
   // New setters for inline detail view
   const setSolicitudToViewInline = useCallback((solicitud: SolicitudData | null) => {
     setSolicitudToViewInlineState(solicitud);
-    setIsDetailViewInlineVisibleState(!!solicitud); // Show detail if a solicitud is set
+    setIsDetailViewInlineVisibleState(!!solicitud); 
   }, []);
 
   const setIsDetailViewInlineVisible = useCallback((isVisible: boolean) => {
     setIsDetailViewInlineVisibleState(isVisible);
     if (!isVisible) {
-      setSolicitudToViewInlineState(null); // Clear solicitud when hiding detail view
+      setSolicitudToViewInlineState(null); 
     }
   }, []);
 
