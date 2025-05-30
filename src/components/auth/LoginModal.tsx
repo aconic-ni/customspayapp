@@ -10,27 +10,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { X, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+// import { useAuth } from '@/context/AuthContext'; // No se necesita setStaticUser
 import type { AppUser } from '@/types';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (isStaticUser?: boolean) => void;
+  onLoginSuccess: () => void; // onLoginSuccess ya no necesita el parámetro isStaticUser
 }
 
-// Static credentials
-const STATIC_USER_EMAIL = "ejecutivos@aconic.com.ni";
-const STATIC_USER_PASS = "test123";
+// Static credentials eliminados
+// const STATIC_USER_EMAIL = "ejecutivos@aconic.com.ni";
+// const STATIC_USER_PASS = "test123";
 
 export function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
-  const { setStaticUser } = useAuth();
+  // const { setStaticUser } = useAuth(); // Eliminado
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -43,24 +43,13 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps)
       return;
     }
 
-    if (email === STATIC_USER_EMAIL && password === STATIC_USER_PASS) {
-      const staticUser: AppUser = {
-        uid: 'static_user_uid',
-        email: STATIC_USER_EMAIL,
-        displayName: 'Usuario Ejecutivo',
-        isStaticUser: true,
-      };
-      setStaticUser(staticUser);
-      toast({ title: 'Inicio de sesión de ejecutivo exitoso', description: 'Bienvenido.' });
-      onLoginSuccess(true);
-      setLoading(false);
-      return;
-    }
+    // Lógica de usuario estático eliminada
+    // if (email === STATIC_USER_EMAIL && password === STATIC_USER_PASS) { ... }
     
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Inicio de sesión exitoso', description: 'Bienvenido a CustomsFA-L.' });
-      onLoginSuccess(false);
+      onLoginSuccess(); // Ya no se pasa parámetro
     } catch (err: any) {
       let userFriendlyError = 'Error al iniciar sesión. Inténtelo de nuevo.';
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -144,7 +133,6 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps)
             </div>
           </div>
            {error && <p className="text-sm text-destructive">{error}</p>}
-          {/* Removed contact information div below */}
           <DialogFooter>
             <Button type="submit" className="btn-primary text-primary-foreground px-8 py-3 rounded-md font-medium w-full" disabled={loading}>
               {loading ? 'Ingresando...' : 'Ingresar'}

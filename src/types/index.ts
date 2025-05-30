@@ -61,8 +61,8 @@ export interface AppUser {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  isStaticUser?: boolean;
-  role?: 'revisor' | 'calificador' | 'autorevisor' | string; // Added 'autorevisor'
+  // isStaticUser?: boolean; // Eliminado
+  role?: 'revisor' | 'calificador' | 'autorevisor' | string;
 }
 
 // Represents the structure of each document in the "SolicitudCheques" collection

@@ -65,7 +65,7 @@ interface SearchResultsTableProps {
   currentUserRole?: string;
   onUpdatePaymentStatus: (solicitudId: string, status: string | null, message?: string) => Promise<void>;
   onOpenMessageDialog: (solicitudId: string) => void;
-  onViewDetails: (solicitud: SolicitudRecord) => void; // Cambiado para vista en línea
+  onViewDetails: (solicitud: SolicitudRecord) => void;
   filterSolicitudIdInput: string;
   setFilterSolicitudIdInput: (value: string) => void;
   filterNEInput: string;
@@ -93,7 +93,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   currentUserRole,
   onUpdatePaymentStatus,
   onOpenMessageDialog,
-  onViewDetails, // Usar esta prop
+  onViewDetails,
   filterSolicitudIdInput,
   setFilterSolicitudIdInput,
   filterNEInput,
@@ -320,7 +320,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onViewDetails(solicitud)} // Llamar a onViewDetails
+                      onClick={() => onViewDetails(solicitud)}
                     >
                       <Eye className="mr-2 h-4 w-4" /> Ver
                     </Button>
@@ -356,7 +356,6 @@ export default function DatabasePage() {
   const [currentSolicitudIdForMessage, setCurrentSolicitudIdForMessage] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
 
-  // State for table column filters
   const [filterSolicitudIdInput, setFilterSolicitudIdInput] = useState('');
   const [filterNEInput, setFilterNEInput] = useState('');
   const [filterEstadoPagoInput, setFilterEstadoPagoInput] = useState('');
@@ -367,7 +366,6 @@ export default function DatabasePage() {
   const [filterUsuarioDeInput, setFilterUsuarioDeInput] = useState('');
   const [filterGuardadoPorInput, setFilterGuardadoPorInput] = useState('');
 
-  // State for inline detail view
   const [solicitudToViewInline, setSolicitudToViewInline] = useState<SolicitudRecord | null>(null);
   const [isDetailViewVisible, setIsDetailViewVisible] = useState(false);
 
@@ -385,12 +383,6 @@ export default function DatabasePage() {
   const displayedSolicitudes = useMemo(() => {
     if (!fetchedSolicitudes) return null;
     let filtered = fetchedSolicitudes;
-  
-    const applyFilter = <T,>(data: T[], condition: (item: T) => boolean): T[] => {
-      const result = data.filter(condition);
-      return result.length > 0 ? result : data; // Consider if this should be "data" or "[]" when no match. For now, it seems it intends to return original if filter yields nothing.
-                                                // Or, if multiple filters, it should chain. If one filter yields [], subsequent filters work on [].
-    };
   
     if (filterSolicitudIdInput) {
       filtered = filtered.filter(s =>
@@ -445,11 +437,11 @@ export default function DatabasePage() {
       );
     }
   
-    if (filterGuardadoPorInput && user?.role !== 'autorevisor') { // Autorevisor has this field locked
+    if (filterGuardadoPorInput && user?.role !== 'autorevisor') {
       filtered = filtered.filter(s =>
         (s.savedBy || '').toLowerCase().includes(filterGuardadoPorInput.toLowerCase())
       );
-    } else if (user?.role === 'autorevisor' && user?.email) { // Autorevisor always filters by their own email for 'Guardado Por'
+    } else if (user?.role === 'autorevisor' && user?.email) {
         filtered = filtered.filter(s =>
         (s.savedBy || '').toLowerCase() === user.email!.toLowerCase()
       );
@@ -467,7 +459,7 @@ export default function DatabasePage() {
     filterDeclaracionInput,
     filterUsuarioDeInput,
     filterGuardadoPorInput,
-    user?.role, // Add user role and email to dependency array
+    user?.role,
     user?.email
   ]);
   
@@ -484,13 +476,12 @@ export default function DatabasePage() {
       if (message && message.trim() !== '') {
         newStatus = `Error: ${message.trim()}`;
       } else if (message === '' && status && status.startsWith('Error:')) {
-        // This case is handled by the logic below: if message is empty, and current status is error, it becomes null.
-      } else if (message === '' && !status) { // If message is empty and the intention is to clear a status
+      } else if (message === '' && !status) {
          const currentSolicitud = fetchedSolicitudes?.find(s => s.solicitudId === solicitudId);
          if(currentSolicitud?.paymentStatus?.startsWith('Error:')) {
-            newStatus = null; // Clear error if message is made empty
+            newStatus = null;
          } else if (status === null && currentSolicitud?.paymentStatus === 'Pagado') {
-            newStatus = null; // Clear "Pagado" status if switch is toggled off
+            newStatus = null;
          }
       }
 
@@ -550,9 +541,8 @@ export default function DatabasePage() {
 
   useEffect(() => {
     if (isClient && !authLoading) {
-      const isAutorevisor = user?.role === 'autorevisor';
-      const isAuthorized = user && (user.isStaticUser || user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
-      if (!isAuthorized && !isDetailViewVisible) { // Don't redirect if detail view is visible (might be from a direct link initially)
+      const isAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
+      if (!isAuthorized && !isDetailViewVisible) { 
         if (!fetchedSolicitudes) { 
           router.push('/');
         }
@@ -572,10 +562,9 @@ export default function DatabasePage() {
     setError(null);
     setFetchedSolicitudes(null);
     setCurrentSearchTermForDisplay('');
-    setIsDetailViewVisible(false); // Hide detail view on new search
+    setIsDetailViewVisible(false);
     setSolicitudToViewInline(null);
 
-    // Reset column filters on new search
     setFilterSolicitudIdInput('');
     setFilterNEInput('');
     setFilterEstadoPagoInput('');
@@ -752,7 +741,7 @@ export default function DatabasePage() {
       case "ne":
       case "solicitudId":
         return <Input type="text" placeholder={searchType === "ne" ? "Ingrese NE (Ej: NX1-12345)" : "Ingrese ID Solicitud Completo"} value={searchTermText} onChange={(e) => setSearchTermText(e.target.value)} className="flex-grow" aria-label="Término de búsqueda" />;
-      case "manager": // "Por Usuario (Guardado Por)"
+      case "manager":
         return (
           <div className="flex-grow space-y-3">
             <Input 
@@ -907,7 +896,7 @@ export default function DatabasePage() {
           <DialogHeader>
             <DialogTitle>Añadir Mensaje de Error para Solicitud</DialogTitle>
             <DialogDescription>
-              Solicitud ID: {currentSolicitudIdForMessage}. Si guarda un mensaje, el estado se marcará como "Error".
+              Solicitud ID: {currentSolicitudIdForMessage}. Si guarda un mensaje, el estado se marcará como &quot;Error&quot;.
               Si guarda un mensaje vacío y el estado actual es un error, se limpiará el estado de error.
             </DialogDescription>
           </DialogHeader>

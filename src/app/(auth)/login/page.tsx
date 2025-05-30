@@ -1,7 +1,7 @@
 
 "use client";
 import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
+import { useRouter, usePathname } from 'next/navigation';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 export default function LoginPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); // Get current pathname
+  const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -23,18 +23,17 @@ export default function LoginPage() {
       let targetPath = '/examiner'; // Default
       if (user.role === 'autorevisor') {
         targetPath = '/examiner';
-      } else if (user.isStaticUser || user.role === 'revisor' || user.role === 'calificador') {
+      } else if (user.role === 'revisor' || user.role === 'calificador') { // Eliminada la condición user.isStaticUser
         targetPath = '/database';
       }
-      // Only push if not already on the target path
       if (pathname !== targetPath) {
         router.push(targetPath);
       }
     }
-  }, [user, loading, router, isClient, pathname]); // Added pathname to dependencies
+  }, [user, loading, router, isClient, pathname]);
 
   const handleLoginSuccess = () => {
-    // Redirection is handled by the useEffect listening to AuthContext's 'user' state.
+    // La redirección es manejada por el useEffect
   };
 
   if (!isClient || loading) {
@@ -45,7 +44,6 @@ export default function LoginPage() {
     );
   }
 
-  // If user exists and we are still on this page, it means redirection is pending.
   if (user) { 
     return (
       <div className="min-h-screen flex items-center justify-center grid-bg">
@@ -55,14 +53,11 @@ export default function LoginPage() {
     );
   }
 
-  // Only render LoginModal if not loading, client is ready, and no user (meaning they need to log in)
   return (
     <div className="min-h-screen flex items-center justify-center grid-bg">
        <LoginModal
-         isOpen={true} // This modal is always open on this dedicated login page
+         isOpen={true}
          onClose={() => {
-           // If user manually closes, behavior might depend on whether they are on "/" or "/login"
-           // For "/login", perhaps redirect to "/" or just allow it to stay (though useEffect should redirect if logged in)
            if (pathname === '/login') router.push('/');
          }}
          onLoginSuccess={handleLoginSuccess}
