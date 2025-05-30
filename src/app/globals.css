@@ -191,54 +191,57 @@ body {
 
 /* Print styles for dedicated Solicitud Detail Page */
 @media print {
-  body, html {
-    visibility: hidden !important;
+  body, html { /* Basic page resets */
     background: white !important;
-    height: auto !important;
-    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    font-size: 9pt !important;
+    font-size: 9pt !important; /* Base font size for print */
     color: black !important;
-    /* overflow: hidden !important;  Allow content to flow for multi-page if necessary, browser print dialog will handle fit-to-page */
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    height: auto !important;
+    width: 100% !important;
+    overflow: visible !important;
   }
 
-  .solicitud-detail-print-area, .solicitud-detail-print-area * {
+  /* Hide everything by default */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Make only the print area and its contents visible */
+  .solicitud-detail-print-area,
+  .solicitud-detail-print-area * {
     visibility: visible !important;
-    background-color: transparent !important;
-    color: black !important;
+    background-color: transparent !important; /* Ensure no inherited backgrounds */
+    color: black !important; /* Ensure text is black */
     box-shadow: none !important;
     text-shadow: none !important;
-    border-color: #ccc !important;
   }
 
+  /* Position the print area to take over the page */
   .solicitud-detail-print-area {
-    position: static !important;
-    display: block !important;
-    width: 100% !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important; /* Use full width */
     max-width: 100% !important;
-    height: auto !important;
-    max-height: none !important;
-    /* overflow: hidden !important; REMOVED to allow content to flow if needed */
-    padding: 10px !important; 
-    margin: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    page-break-after: avoid !important;
+    margin: 0 !important; /* No margins on the print area itself */
+    padding: 10mm !important; /* Desired page margin for printing */
+    border: none !important; /* No borders on the print area itself */
+    box-sizing: border-box !important; /* Include padding in width */
+    height: auto !important; /* Let content determine height */
+    overflow: visible !important; /* Show all content */
   }
 
   .solicitud-detail-print-area .no-print {
     display: none !important;
-    visibility: hidden !important;
   }
   
   .solicitud-detail-print-area .card-print-styles {
      border: 1px solid #ccc !important;
-     padding: 10px !important;
+     padding: 10px !important; /* Internal padding for content within cards */
      page-break-inside: avoid !important;
-     /* overflow: hidden !important; REMOVED to allow content to flow if needed */
   }
   
   .solicitud-detail-print-area img {
@@ -249,12 +252,7 @@ body {
     page-break-inside: avoid !important;
   }
 
-  /* Hide AppShell header and footer */
-  header.sticky, footer.py-4, .app-shell-footer {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
+  /* Typography and layout adjustments specifically for printing */
   .solicitud-detail-print-area h1, 
   .solicitud-detail-print-area h2, 
   .solicitud-detail-print-area h3, 
@@ -299,14 +297,14 @@ body {
 
   .solicitud-detail-print-area .card-print-styles .grid[class*="md:grid-cols-2"],
   .solicitud-detail-print-area .card-print-styles .grid[class*="md:grid-cols-3"] {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important; /* Force 2 columns for print */
     gap: 0.1rem 0.3rem !important;
   }
   
   .solicitud-detail-print-area .card-print-styles .grid .md\:col-span-2,
   .solicitud-detail-print-area .card-print-styles .grid .md\:col-span-3,
   .solicitud-detail-print-area .card-print-styles .grid .lg\:col-span-2 {
-     grid-column: span 2 / span 2 !important;
+     grid-column: span 2 / span 2 !important; /* Ensure spans adapt to 2 columns */
   }
 
   .solicitud-detail-print-area .card-print-styles div[class*="py-1"] {
@@ -314,11 +312,21 @@ body {
     padding-bottom: 0.05rem !important;
   }
 
-  .solicitud-detail-print-area .lucide-icon { 
+  .solicitud-detail-print-area .lucide-icon { /* Hide icons by default for cleaner print */
     display: none !important; 
   }
+  /* Specific icons like CheckSquare and Square used in CheckboxDetailItem should remain visible.
+     This requires them NOT to have the .lucide-icon class or to have an override.
+     Assuming CheckSquare/Square components render SVGs directly without this class.
+     If they DO have .lucide-icon, they would need a specific override like:
+     .solicitud-detail-print-area .checkbox-icon-override { display: inline-block !important; }
+     and that class added to the CheckSquare/Square icons in CheckboxDetailItem.
+     For now, we rely on them not having the generic .lucide-icon class.
+  */
+
+
   .solicitud-detail-print-area .text-muted-foreground {
-    color: #444 !important;
+    color: #444 !important; /* Slightly lighter black for muted text */
   }
   .solicitud-detail-print-area .divide-y > :not([hidden]) ~ :not([hidden]) {
     border-top-width: 1px !important;
