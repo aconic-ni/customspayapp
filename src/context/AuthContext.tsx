@@ -28,14 +28,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       return;
     }
 
-    // If a static user is already set, don't override with Firebase auth state immediately
-    // This allows static login to work without being clobbered by onAuthStateChanged if it runs slightly later
-    if (user?.isStaticUser) {
-      setLoading(false);
-      return;
-    }
+    // Set loading to true when we start listening for auth changes.
+    setLoading(true);
 
     const unsubscribe = onAuthStateChanged(auth as Auth, async (firebaseUser: FirebaseUser | null) => {
+      const currentLocalUserIsStatic = user?.isStaticUser;
+
       if (firebaseUser) {
         let userRole: string | undefined = undefined;
         try {
@@ -56,50 +54,50 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           isStaticUser: false,
-          role: userRole, // Set the fetched role
+          role: userRole,
         });
       } else {
-        // No Firebase user, check if a static user was previously set and clear it if necessary
-        // This handles the case where a static user logs out, or if a Firebase session ends.
-        if (user && !user.isStaticUser) { // Only clear if it wasn't a static user already logged out
-            setUser(null);
-        } else if (!user) { // If user is already null (e.g. initial load, no one logged in)
+        // No Firebase user.
+        // If the current local user is not static, set to null.
+        // If it is static, keep them (static login persists until explicit static logout).
+        if (!currentLocalUserIsStatic) {
             setUser(null);
         }
-        // if user is static and firebaseUser is null, we keep the static user.
       }
-      setLoading(false); // Set loading false after user and role are processed
+      setLoading(false); 
     });
 
     return () => unsubscribe();
-  // Ensure user object itself is a dependency, not just one of its properties.
-  }, [isFirebaseInitialized, user]);
+  // Only depend on isFirebaseInitialized. auth instance is stable.
+  // Removing `user` from dependencies here is key to prevent re-subscribing `onAuthStateChanged`
+  // when the `user` state itself changes due to login/logout or role fetch.
+  }, [isFirebaseInitialized]);
 
   const logout = async () => {
+    const wasStaticUser = user?.isStaticUser;
     setLoading(true);
-    const isLoggingOutStaticUser = user?.isStaticUser;
     try {
-      if (!isLoggingOutStaticUser) {
+      if (!wasStaticUser) {
         await firebaseSignOut(auth as Auth);
+        // For Firebase users, onAuthStateChanged will handle setting user to null and loading to false.
+      } else {
+        // For static users, explicitly clear user and set loading to false.
+        setUser(null);
+        setLoading(false);
       }
-      // For both static and Firebase users, setUser(null) is critical.
-      // onAuthStateChanged will handle setting user to null for Firebase users.
-      // For static users, this explicitly clears them.
-      setUser(null);
     } catch (error) {
       console.error("Error signing out: ", error);
-    } finally {
-      // setLoading(false) will be handled by onAuthStateChanged for Firebase logout,
-      // or immediately for static user logout.
-      if (isLoggingOutStaticUser) {
-        setLoading(false);
+      // If Firebase signout fails, ensure loading is false.
+      // For static user logout, loading is already handled if this block is reached.
+      if (!wasStaticUser) {
+          setLoading(false);
       }
     }
   };
 
   const setStaticUser = (staticUser: AppUser | null) => {
     setUser(staticUser);
-    setLoading(false);
+    setLoading(false); // Static user state is immediately known.
   };
   
   return (
