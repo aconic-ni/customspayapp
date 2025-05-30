@@ -52,9 +52,6 @@ interface SolicitudDetailViewProps {
 export default function SolicitudDetailView({ solicitud, initialData, onBackToList }: SolicitudDetailViewProps) {
   
   const handlePrint = () => {
-    // This uses the browser's print functionality.
-    // Ensure your @media print CSS rules in globals.css correctly target
-    // this component's wrapper ('solicitud-detail-print-area') to print only this section.
     window.print(); 
   };
 
@@ -99,22 +96,10 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
   }
 
   return (
-    <div className="solicitud-detail-print-area py-2 md:py-0"> 
+    <div className="solicitud-detail-print-area py-0"> 
       <Card className="w-full max-w-4xl mx-auto custom-shadow card-print-styles">
-        <CardHeader className="no-print">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-xl md:text-2xl font-semibold text-foreground">Detalle de Solicitud</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onBackToList}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Lista
-              </Button>
-              <Button variant="outline" onClick={handlePrint}>
-                <Printer className="mr-2 h-4 w-4" /> Imprimir
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
+        {/* CardHeader has been removed */}
+        <CardContent className="pt-4"> {/* Reduced top padding from pt-6 to pt-4 */}
             <Image
                 src="/imagenes/HEADERSOLICITUDDETAIL.svg"
                 alt="Header Solicitud Detail"
