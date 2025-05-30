@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import defaultTheme from 'tailwindcss/defaultTheme';
 
 export default {
     darkMode: ["class"],
@@ -8,7 +9,11 @@ export default {
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-  	extend: {
+    extend: {
+      fontFamily: {
+        sans: ['var(--font-geist-sans)', ...defaultTheme.fontFamily.sans],
+        mono: ['var(--font-geist-mono)', ...defaultTheme.fontFamily.mono],
+      },
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
@@ -82,11 +87,21 @@ export default {
   				to: {
   					height: '0'
   				}
-  			}
+  			},
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        'fade-in-50': {
+          from: { opacity: '0', transform: 'translateY(10px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        }
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+        'fade-in': 'fade-in 0.5s ease-out',
+        'fade-in-50': 'fade-in-50 0.5s ease-out',
   		}
   	}
   },
