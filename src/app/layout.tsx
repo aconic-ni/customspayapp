@@ -14,7 +14,7 @@ const inter = Inter({ // Changed from Geist to Inter
 
 export const metadata: Metadata = {
   title: 'ACONIC FAL', // Updated title
-  description: 'Sistema de Examenes Previos by Jordy Stvaer', // Updated description
+  description: 'Sistema de Gestion de Pagos Aduaneros | Stvaer © 2025 for ACONIC', // Updated description
 };
 
 export default function RootLayout({
