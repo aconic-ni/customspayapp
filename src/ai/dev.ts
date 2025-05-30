@@ -1,5 +1,1 @@
-import { config } from 'dotenv';
-config();
-
-import '@/ai/flows/generate-welcome-message.ts';
-import '@/ai/flows/customize-message-tone.ts';
+// Flows will be imported for their side effects in this file.

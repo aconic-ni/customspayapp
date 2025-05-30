@@ -1,18 +1,20 @@
-# **App Name**: Welcomatic
+# **App Name**: ACONIC Examiner
 
 ## Core Features:
 
-- AI Welcome Message: Generate personalized welcome messages using AI, considering the user's history or profile. The AI tool decides the message's tone, content, and format based on available data.
-- Preference Settings: Allow users to set their preferences for the types of welcome messages they want to receive (e.g., formal, informal, humorous).
-- A/B Testing: A/B test different welcome messages to optimize for engagement, tracking which messages lead to higher user retention or interaction.
-- Media Display: Display different types of media such as short video messages, animated greetings, or interactive elements.
+- User Authentication: Firebase authentication integration with a login modal for user authentication using username/password.
+- Static User Backup: Static user configuration that reads local user credentials for environments where Firebase auth is not available.
+- Initial Exam Information Capture: Collect NE (NX1 tracking), Reference, Manager Name, and Merchandise Location in initial data capture form.
+- Dynamic Product List: Enable dynamic adding of items to the list, capturing details like item number, description, brand, quantity, and state. Present this data in a tabular format for easy review and management.
+- Preview and Confirmation: Display a consolidated preview of all the collected information to confirm accuracy before finalizing.
+- Export to PDF/Excel: Allow users to download collected data as PDF and Excel for record-keeping and offline access.
+- CI/CD Deployment Automation: Generate a GitHub Actions workflow file for CI/CD to automate deployments to GitHub Pages.
 
 ## Style Guidelines:
 
-- Primary color: Soft, inviting blue (#64B5F6), evoking trust and friendliness.
-- Background color: Light, desaturated blue (#E3F2FD) to ensure readability and calmness.
-- Accent color: Gentle, analogous green (#A5D6A7) to suggest growth and positive reinforcement.
-- Clean, sans-serif fonts optimized for readability.
-- Friendly, approachable icons that relate to user personalization and AI elements.
-- Balanced layout with clear sections for preferences, message display, and optional interactive elements.
-- Smooth, subtle animations for generating and displaying welcome messages to enhance the user experience without being distracting.
+- Primary color: Use a moderate blue (#4F759B) to evoke a sense of trust and professionalism.
+- Background color: Very light blue (#F0F4F8) for a clean and airy feel.
+- Accent color: Use a slightly darker and contrasting blue (#7091AB) to highlight interactive elements.
+- Use clear, modern sans-serif fonts.
+- Employ minimalist icons with a consistent style to represent different functionalities.
+- Maintain a clean, grid-based layout with ample spacing for readability and ease of use.

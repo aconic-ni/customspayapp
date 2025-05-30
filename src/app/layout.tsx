@@ -1,34 +1,42 @@
-import type {Metadata} from 'next';
-import { Inter } from 'next/font/google'; // Using Inter as a default, Geist is also good
-import { Geist, Geist_Mono } from 'next/font/google';
+
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google'; // Changed from Geist to Inter
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from '@/context/AuthContext';
+import { AppProvider } from '@/context/AppContext';
+import { Toaster } from '@/components/ui/toaster';
+import { FirebaseAppProvider } from '@/context/FirebaseAppContext'; // Renamed to avoid conflict
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const inter = Inter({ // Changed from Geist to Inter
+  variable: '--font-inter', // Changed variable name
   subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: 'Welcomatic',
-  description: 'AI-Powered Welcome Messages',
+  title: 'ACONIC FAL', // Updated title
+  description: 'Sistema de Examenes Previos by Jordy Stvaer', // Updated description
 };
 
 export default function RootLayout({
   children,
+  params,
 }: Readonly<{
   children: React.ReactNode;
+  params: { [key: string]: string | string[] | undefined };
 }>) {
+  // Removed console.log(params);
+
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
-        <Toaster />
+    <html lang="es">
+      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning={true}> {/* Use Inter variable */}
+        <FirebaseAppProvider>
+          <AuthProvider>
+            <AppProvider>
+              {children}
+              <Toaster />
+            </AppProvider>
+          </AuthProvider>
+        </FirebaseAppProvider>
       </body>
     </html>
   );
