@@ -447,7 +447,7 @@ export default function DatabasePage() {
       filtered = filtered.filter(s =>
         (s.savedBy || '').toLowerCase().includes(filterGuardadoPorInput.toLowerCase())
       );
-    } else if (user?.role === 'autorevisor' && user.email) { // Autorevisor always filters by their own email for 'Guardado Por'
+    } else if (user?.role === 'autorevisor' && user?.email) { // Autorevisor always filters by their own email for 'Guardado Por'
         filtered = filtered.filter(s =>
         (s.savedBy || '').toLowerCase() === user.email!.toLowerCase()
       );
@@ -808,7 +808,10 @@ export default function DatabasePage() {
       <AppShell>
         <div className="py-2 md:py-5">
           <div className="mb-4">
-             <Button onClick={handleBackToTable} variant="outline">
+             <Button 
+                onClick={handleBackToTable} 
+                className="bg-green-600 text-white hover:bg-green-600 hover:text-white"
+              >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Búsqueda
              </Button>
           </div>
