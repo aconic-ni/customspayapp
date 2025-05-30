@@ -44,7 +44,7 @@ export function ProductTable() {
   if (solicitudes.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        No hay solicitudes añadidas. Haga clic en "Añadir Nueva Solicitud" para comenzar.
+        No hay solicitudes añadidas. Haga clic en &quot;Añadir Nueva Solicitud&quot; para comenzar.
       </div>
     );
   }

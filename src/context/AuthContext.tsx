@@ -72,9 +72,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     });
 
     return () => unsubscribe();
-  // Ensure user.isStaticUser is a dependency so that if a static user logs out and setStaticUser(null) is called,
-  // this effect re-evaluates and onAuthStateChanged can take over if needed.
-  }, [isFirebaseInitialized, user?.isStaticUser]);
+  // Ensure user object itself is a dependency, not just one of its properties.
+  }, [isFirebaseInitialized, user]);
 
   const logout = async () => {
     setLoading(true);
