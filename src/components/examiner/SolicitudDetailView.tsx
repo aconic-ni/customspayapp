@@ -49,6 +49,8 @@ interface SolicitudDetailViewProps {
   onBackToList: () => void;
 }
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 export default function SolicitudDetailView({ solicitud, initialData, onBackToList }: SolicitudDetailViewProps) {
   
   const handlePrint = () => {
@@ -101,7 +103,7 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
         {/* CardHeader has been removed */}
         <CardContent className="pt-4"> {/* Reduced top padding from pt-6 to pt-4 */}
             <Image
-                src="/imagenes/HEADERSOLICITUDDETAIL.svg"
+                src={`${basePath}/imagenes/HEADERSOLICITUDDETAIL.svg`}
                 alt="Header Solicitud Detail"
                 width={800}
                 height={100}
@@ -227,7 +229,7 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
             </div>
 
             <Image
-                src="/imagenes/FOOTERSOLICITUDETAIL.svg"
+                src={`${basePath}/imagenes/FOOTERSOLICITUDETAIL.svg`}
                 alt="Footer Solicitud Detail"
                 width={800}
                 height={100}
