@@ -17,6 +17,7 @@ export async function generateStaticParams() {
   return [];
 }
 
-export default function SolicitudDatabaseDetailPage({ params }: { params: { id: string } }) {
+export default async function SolicitudDatabaseDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = await paramsPromise;
   return <ClientPage id={params.id} />;
 }
