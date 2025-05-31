@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useAppContext, SolicitudStep } from '@/context/AppContext';
 import { CheckCircle, FilePlus, RotateCcw, Save, Mail } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, Timestamp } from "firebase/firestore";
+import { doc, setDoc, Timestamp as FirestoreTimestamp } from "firebase/firestore"; // Renamed Timestamp
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { SolicitudRecord, InitialDataContext, SolicitudData } from '@/types';
@@ -53,19 +53,23 @@ export function SuccessModal() {
           continue;
         }
 
-        const montoAsNumber = typeof solicitud.monto === 'string'
-          ? parseFloat(solicitud.monto.replace(/,/g, ''))
-          : solicitud.monto;
+        // Ensure monto is a number or null
+        const montoAsNumber = typeof solicitud.monto === 'number' ? solicitud.monto : null;
+        if (solicitud.monto !== undefined && montoAsNumber === null) {
+            console.warn(`Monto for solicitud ${solicitud.id} was not a valid number, saving as null.`);
+        }
 
-        const docData: SolicitudRecord = {
+
+        // Prepare data for Firestore, converting JS Dates to Firestore Timestamps
+        const dataToSave = {
           examNe: initialContextData.ne,
           examReference: initialContextData.reference || null,
           examManager: initialContextData.manager,
-          examDate: Timestamp.fromDate(initialContextData.date),
+          examDate: FirestoreTimestamp.fromDate(initialContextData.date), // Convert JS Date to Firestore Timestamp
           examRecipient: initialContextData.recipient,
 
           solicitudId: solicitud.id,
-          monto: montoAsNumber ?? null,
+          monto: montoAsNumber,
           montoMoneda: solicitud.montoMoneda || null,
           cantidadEnLetras: solicitud.cantidadEnLetras || null,
           consignatario: solicitud.consignatario || null,
@@ -101,12 +105,13 @@ export function SuccessModal() {
           correo: solicitud.correo || null,
           observation: solicitud.observation || null,
 
-          savedAt: Timestamp.fromDate(new Date()),
+          savedAt: FirestoreTimestamp.fromDate(new Date()), // Current time as Firestore Timestamp
           savedBy: user.email,
+          // paymentStatus fields are not set here, they are updated from database page
         };
 
         const solicitudDocRef = doc(db, "SolicitudCheques", solicitud.id);
-        await setDoc(solicitudDocRef, docData);
+        await setDoc(solicitudDocRef, dataToSave);
       }
 
       if (allSavedSuccessfully) {

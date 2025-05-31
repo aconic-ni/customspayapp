@@ -27,7 +27,7 @@ const DetailItem: React.FC<{ label: string; value?: string | number | null | boo
   let displayValue: string;
   if (typeof value === 'boolean') {
     displayValue = value ? 'Sí' : 'No';
-  } else if (value && value instanceof Date) { // Check if value is not null/undefined before instanceof
+  } else if (value && typeof value === 'object' && value instanceof Date) { 
     displayValue = format(value, "PPP", { locale: es });
   } else {
     displayValue = String(value ?? 'N/A');
@@ -87,51 +87,57 @@ export default function ClientPage({ id: solicitudIdFromProp, onBackToList, isIn
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          const record = docSnap.data() as SolicitudRecord;
+          const recordData = docSnap.data();
+
+          // Type assertion for Firestore Timestamps to convert to JS Date
+          const examDateFirestore = recordData.examDate as FirestoreTimestamp;
+          // const savedAtFirestore = recordData.savedAt as FirestoreTimestamp;
+          // const paymentStatusLastUpdatedAtFirestore = recordData.paymentStatusLastUpdatedAt as FirestoreTimestamp | undefined;
+
 
           const fetchedInitialData: InitialDataContext = {
-            ne: record.examNe,
-            reference: record.examReference || '',
-            manager: record.examManager,
-            date: record.examDate && typeof record.examDate === 'object' && 'toDate' in record.examDate ? (record.examDate as FirestoreTimestamp).toDate() : new Date(record.examDate as any),
-            recipient: record.examRecipient,
+            ne: recordData.examNe,
+            reference: recordData.examReference || '',
+            manager: recordData.examManager,
+            date: examDateFirestore.toDate(), // Convert to JS Date
+            recipient: recordData.examRecipient,
           };
           setDisplayInitialData(fetchedInitialData);
 
           const fetchedSolicitudData: SolicitudData = {
-            id: record.solicitudId,
-            monto: record.monto ?? undefined,
-            montoMoneda: record.montoMoneda ?? undefined,
-            cantidadEnLetras: record.cantidadEnLetras ?? undefined,
-            consignatario: record.consignatario ?? undefined,
-            declaracionNumero: record.declaracionNumero ?? undefined,
-            unidadRecaudadora: record.unidadRecaudadora ?? undefined,
-            codigo1: record.codigo1 ?? undefined,
-            codigo2: record.codigo2 ?? undefined, // Codigo MUR
-            banco: record.banco ?? undefined,
-            bancoOtros: record.bancoOtros ?? undefined,
-            numeroCuenta: record.numeroCuenta ?? undefined,
-            monedaCuenta: record.monedaCuenta ?? undefined,
-            monedaCuentaOtros: record.monedaCuentaOtros ?? undefined,
-            elaborarChequeA: record.elaborarChequeA ?? undefined,
-            elaborarTransferenciaA: record.elaborarTransferenciaA ?? undefined,
-            impuestosPagadosCliente: record.impuestosPagadosCliente,
-            impuestosPagadosRC: record.impuestosPagadosRC ?? undefined,
-            impuestosPagadosTB: record.impuestosPagadosTB ?? undefined,
-            impuestosPagadosCheque: record.impuestosPagadosCheque ?? undefined,
-            impuestosPendientesCliente: record.impuestosPendientesCliente,
-            soporte: record.soporte,
-            documentosAdjuntos: record.documentosAdjuntos,
-            constanciasNoRetencion: record.constanciasNoRetencion,
-            constanciasNoRetencion1: record.constanciasNoRetencion1,
-            constanciasNoRetencion2: record.constanciasNoRetencion2,
-            pagoServicios: record.pagoServicios,
-            tipoServicio: record.tipoServicio ?? undefined,
-            otrosTipoServicio: record.otrosTipoServicio ?? undefined,
-            facturaServicio: record.facturaServicio ?? undefined,
-            institucionServicio: record.institucionServicio ?? undefined,
-            correo: record.correo ?? undefined,
-            observation: record.observation ?? undefined,
+            id: recordData.solicitudId,
+            monto: recordData.monto ?? undefined,
+            montoMoneda: recordData.montoMoneda ?? undefined,
+            cantidadEnLetras: recordData.cantidadEnLetras ?? undefined,
+            consignatario: recordData.consignatario ?? undefined,
+            declaracionNumero: recordData.declaracionNumero ?? undefined,
+            unidadRecaudadora: recordData.unidadRecaudadora ?? undefined,
+            codigo1: recordData.codigo1 ?? undefined,
+            codigo2: recordData.codigo2 ?? undefined, // Codigo MUR
+            banco: recordData.banco ?? undefined,
+            bancoOtros: recordData.bancoOtros ?? undefined,
+            numeroCuenta: recordData.numeroCuenta ?? undefined,
+            monedaCuenta: recordData.monedaCuenta ?? undefined,
+            monedaCuentaOtros: recordData.monedaCuentaOtros ?? undefined,
+            elaborarChequeA: recordData.elaborarChequeA ?? undefined,
+            elaborarTransferenciaA: recordData.elaborarTransferenciaA ?? undefined,
+            impuestosPagadosCliente: recordData.impuestosPagadosCliente,
+            impuestosPagadosRC: recordData.impuestosPagadosRC ?? undefined,
+            impuestosPagadosTB: recordData.impuestosPagadosTB ?? undefined,
+            impuestosPagadosCheque: recordData.impuestosPagadosCheque ?? undefined,
+            impuestosPendientesCliente: recordData.impuestosPendientesCliente,
+            soporte: recordData.soporte,
+            documentosAdjuntos: recordData.documentosAdjuntos,
+            constanciasNoRetencion: recordData.constanciasNoRetencion,
+            constanciasNoRetencion1: recordData.constanciasNoRetencion1,
+            constanciasNoRetencion2: recordData.constanciasNoRetencion2,
+            pagoServicios: recordData.pagoServicios,
+            tipoServicio: recordData.tipoServicio ?? undefined,
+            otrosTipoServicio: recordData.otrosTipoServicio ?? undefined,
+            facturaServicio: recordData.facturaServicio ?? undefined,
+            institucionServicio: recordData.institucionServicio ?? undefined,
+            correo: recordData.correo ?? undefined,
+            observation: recordData.observation ?? undefined,
           };
           setDisplaySolicitud(fetchedSolicitudData);
 

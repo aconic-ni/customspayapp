@@ -1,5 +1,5 @@
 
-import type { Timestamp } from 'firebase/firestore';
+import type { Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 
 // Represents the data collected in the initial form, held in AppContext
 export interface InitialDataContext {
@@ -10,11 +10,12 @@ export interface InitialDataContext {
   recipient: string; // "A:"
 }
 
+// Stricter types for form data and app context
 export interface SolicitudData {
   id: string;
 
-  monto?: number | string; // Could be string from form input, number after parsing
-  montoMoneda?: 'cordoba' | 'dolar' | 'euro' | string;
+  monto?: number; // Will be number in form state due to Zod
+  montoMoneda?: 'cordoba' | 'dolar' | 'euro';
   cantidadEnLetras?: string;
 
   consignatario?: string;
@@ -23,10 +24,10 @@ export interface SolicitudData {
   codigo1?: string;
   codigo2?: string; // Codigo MUR
 
-  banco?: 'BAC' | 'BANPRO' | 'BANCENTRO' | 'FICOSHA' | 'AVANZ' | 'ATLANTIDA' | 'ACCION POR CHEQUE/NO APLICA BANCO' | 'Otros' | string;
+  banco?: 'BAC' | 'BANPRO' | 'BANCENTRO' | 'FICOSHA' | 'AVANZ' | 'ATLANTIDA' | 'ACCION POR CHEQUE/NO APLICA BANCO' | 'Otros';
   bancoOtros?: string;
   numeroCuenta?: string;
-  monedaCuenta?: 'cordoba' | 'dolar' | 'euro' | 'Otros' | string;
+  monedaCuenta?: 'cordoba' | 'dolar' | 'euro' | 'Otros';
   monedaCuentaOtros?: string;
 
   elaborarChequeA?: string;
@@ -45,9 +46,8 @@ export interface SolicitudData {
   constanciasNoRetencion1?: boolean;
   constanciasNoRetencion2?: boolean;
 
-  // New fields for Pago de servicios
   pagoServicios?: boolean;
-  tipoServicio?: 'COMIECO' | 'MARCHAMO' | 'FUMIGACION' | 'RECORRIDO' | 'EPN' | 'ANALISIS_Y_LABORATORIO' | 'OTROS' | string;
+  tipoServicio?: 'COMIECO' | 'MARCHAMO' | 'FUMIGACION' | 'RECORRIDO' | 'EPN' | 'ANALISIS_Y_LABORATORIO' | 'OTROS';
   otrosTipoServicio?: string;
   facturaServicio?: string;
   institucionServicio?: string;
@@ -65,16 +65,15 @@ export interface AppUser {
 }
 
 // Represents the structure of each document in the "SolicitudCheques" collection
+// Uses JS Date objects for client-side consistency. Conversion to Firestore Timestamp happens at write time.
 export interface SolicitudRecord {
-  // Fields from InitialDataContext (general context for the set of solicitudes)
   examNe: string;
   examReference: string | null;
-  examManager: string; // Represents the user who created the solicitud // Labeled "De (Usuario)"
-  examDate: Timestamp | Date; // Can be Firestore Timestamp or Date object after fetching
+  examManager: string;
+  examDate: Date; // Changed from Timestamp | Date
   examRecipient: string;
 
-  // All fields from the specific SolicitudData being saved
-  solicitudId: string; // This is the Firestore document ID for this record
+  solicitudId: string;
 
   monto: number | null;
   montoMoneda: string | null;
@@ -84,7 +83,7 @@ export interface SolicitudRecord {
   declaracionNumero: string | null;
   unidadRecaudadora: string | null;
   codigo1: string | null;
-  codigo2: string | null; // Codigo MUR
+  codigo2: string | null;
 
   banco: string | null;
   bancoOtros: string | null;
@@ -108,7 +107,6 @@ export interface SolicitudRecord {
   constanciasNoRetencion1: boolean;
   constanciasNoRetencion2: boolean;
 
-  // New fields for Pago de servicios
   pagoServicios: boolean;
   tipoServicio: string | null;
   otrosTipoServicio: string | null;
@@ -118,21 +116,19 @@ export interface SolicitudRecord {
   correo: string | null;
   observation: string | null;
 
-  // Metadata
-  savedAt: Timestamp | Date; // Can be Firestore Timestamp or Date object after fetching
-  savedBy: string | null; // User's email
+  savedAt: Date; // Changed from Timestamp | Date
+  savedBy: string | null;
 
-  // New fields for payment status
-  paymentStatus?: string; // e.g., "Pagado", "Error: (mensaje)"
-  paymentStatusLastUpdatedAt?: Timestamp | Date;
+  paymentStatus?: string;
+  paymentStatusLastUpdatedAt?: Date; // Changed from Timestamp | Date
   paymentStatusLastUpdatedBy?: string;
 }
 
 
 // For exporting, it combines InitialDataContext-like info with SolicitudData-like info
 export interface ExportableSolicitudContextData extends Omit<InitialDataContext, 'date'> {
-  date?: Date | Timestamp | null;
-  solicitudes?: SolicitudData[] | null; // Renamed from products to solicitudes
-  savedAt?: Timestamp | Date | null;
+  date?: Date | FirestoreTimestamp | null; // Keep FirestoreTimestamp for potential direct export use
+  solicitudes?: SolicitudData[] | null;
+  savedAt?: Date | FirestoreTimestamp | null;
   savedBy?: string | null;
 }

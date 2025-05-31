@@ -49,8 +49,10 @@ type SearchType = "ne" | "solicitudId" | "manager" | "dateToday" | "dateSpecific
 
 const formatCurrencyFetched = (amount?: number | string | null, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
-    const num = Number(amount);
+    const num = Number(amount); // Number(null) is 0, Number('') is 0
+    if (isNaN(num) && typeof amount === 'string' && amount.trim() === '') return 'N/A'; // Catch empty string specifically if Number('') is not desired
     if (isNaN(num)) return String(amount);
+
     let prefix = '';
     if (currency === 'cordoba') prefix = 'C$';
     else if (currency === 'dolar') prefix = 'US$';
@@ -311,7 +313,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                       : 'N/A'}
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examNe}</TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{formatCurrencyFetched(solicitud.monto, solicitud.montoMoneda || undefined)}</TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{formatCurrencyFetched(solicitud.monto ?? undefined, solicitud.montoMoneda || undefined)}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.consignatario || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.declaracionNumero || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examManager}</TableCell>
@@ -414,7 +416,7 @@ export default function DatabasePage() {
   
     if (filterMontoInput) {
       filtered = filtered.filter(s => {
-        const montoText = formatCurrencyFetched(s.monto, s.montoMoneda || undefined);
+        const montoText = formatCurrencyFetched(s.monto ?? undefined, s.montoMoneda || undefined);
         return montoText.toLowerCase().includes(filterMontoInput.toLowerCase());
       });
     }
@@ -488,7 +490,7 @@ export default function DatabasePage() {
 
       await updateDoc(docRef, {
         paymentStatus: newStatus,
-        paymentStatusLastUpdatedAt: serverTimestamp(),
+        paymentStatusLastUpdatedAt: serverTimestamp(), // Firestore will convert this to its Timestamp
         paymentStatusLastUpdatedBy: user.email,
       });
       toast({ title: "Éxito", description: `Estado de pago actualizado para ${solicitudId}.` });
@@ -497,7 +499,7 @@ export default function DatabasePage() {
           s.solicitudId === solicitudId
             ? { ...s,
                 paymentStatus: newStatus || undefined, 
-                paymentStatusLastUpdatedAt: new Date(),
+                paymentStatusLastUpdatedAt: new Date(), // Update client-side with JS Date
                 paymentStatusLastUpdatedBy: user.email!
               }
             : s
@@ -636,13 +638,58 @@ export default function DatabasePage() {
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           let data = querySnapshot.docs.map(docSnap => { 
-            const docData = docSnap.data() as Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp };
+            const docData = docSnap.data();
+            // Convert Firestore Timestamps to JS Date objects for client-side use
+            const examDate = (docData.examDate as FirestoreTimestamp)?.toDate();
+            const savedAt = (docData.savedAt as FirestoreTimestamp)?.toDate();
+            const paymentStatusLastUpdatedAt = (docData.paymentStatusLastUpdatedAt as FirestoreTimestamp)?.toDate();
+
             return {
               ...docData,
               solicitudId: docSnap.id,
-              examDate: docData.examDate && typeof docData.examDate === 'object' && 'toDate' in docData.examDate ? (docData.examDate as FirestoreTimestamp).toDate() : new Date(docData.examDate as any),
-              savedAt: docData.savedAt && typeof docData.savedAt === 'object' && 'toDate' in docData.savedAt ? (docData.savedAt as FirestoreTimestamp).toDate() : new Date(docData.savedAt as any),
-              paymentStatusLastUpdatedAt: docData.paymentStatusLastUpdatedAt && typeof docData.paymentStatusLastUpdatedAt === 'object' && 'toDate' in docData.paymentStatusLastUpdatedAt ? (docData.paymentStatusLastUpdatedAt as FirestoreTimestamp).toDate() : (docData.paymentStatusLastUpdatedAt ? new Date(docData.paymentStatusLastUpdatedAt as any) : undefined),
+              examDate: examDate,
+              savedAt: savedAt,
+              paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
+              // Ensure all other fields match SolicitudRecord
+              examNe: docData.examNe || '',
+              examReference: docData.examReference || null,
+              examManager: docData.examManager || '',
+              examRecipient: docData.examRecipient || '',
+              monto: docData.monto ?? null,
+              montoMoneda: docData.montoMoneda || null,
+              cantidadEnLetras: docData.cantidadEnLetras || null,
+              consignatario: docData.consignatario || null,
+              declaracionNumero: docData.declaracionNumero || null,
+              unidadRecaudadora: docData.unidadRecaudadora || null,
+              codigo1: docData.codigo1 || null,
+              codigo2: docData.codigo2 || null,
+              banco: docData.banco || null,
+              bancoOtros: docData.bancoOtros || null,
+              numeroCuenta: docData.numeroCuenta || null,
+              monedaCuenta: docData.monedaCuenta || null,
+              monedaCuentaOtros: docData.monedaCuentaOtros || null,
+              elaborarChequeA: docData.elaborarChequeA || null,
+              elaborarTransferenciaA: docData.elaborarTransferenciaA || null,
+              impuestosPagadosCliente: docData.impuestosPagadosCliente ?? false,
+              impuestosPagadosRC: docData.impuestosPagadosRC || null,
+              impuestosPagadosTB: docData.impuestosPagadosTB || null,
+              impuestosPagadosCheque: docData.impuestosPagadosCheque || null,
+              impuestosPendientesCliente: docData.impuestosPendientesCliente ?? false,
+              soporte: docData.soporte ?? false,
+              documentosAdjuntos: docData.documentosAdjuntos ?? false,
+              constanciasNoRetencion: docData.constanciasNoRetencion ?? false,
+              constanciasNoRetencion1: docData.constanciasNoRetencion1 ?? false,
+              constanciasNoRetencion2: docData.constanciasNoRetencion2 ?? false,
+              pagoServicios: docData.pagoServicios ?? false,
+              tipoServicio: docData.tipoServicio || null,
+              otrosTipoServicio: docData.otrosTipoServicio || null,
+              facturaServicio: docData.facturaServicio || null,
+              institucionServicio: docData.institucionServicio || null,
+              correo: docData.correo || null,
+              observation: docData.observation || null,
+              savedBy: docData.savedBy || null,
+              paymentStatus: docData.paymentStatus || undefined,
+              paymentStatusLastUpdatedBy: docData.paymentStatusLastUpdatedBy || undefined,
             } as SolicitudRecord;
           });
           setFetchedSolicitudes(data);

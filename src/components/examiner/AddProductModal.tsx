@@ -81,8 +81,8 @@ export function AddProductModal() {
 
   const form = useForm<SolicitudFormData>({
     resolver: zodResolver(solicitudSchema),
-    defaultValues: { // These must match SolicitudFormData, where monto is number
-      monto: 0, 
+    defaultValues: { 
+      monto: 0, // Zod schema expects number after preprocess
       montoMoneda: 'cordoba',
       cantidadEnLetras: '',
       consignatario: '',
@@ -149,7 +149,6 @@ export function AddProductModal() {
 
 
   useEffect(() => {
-    // watchedMonto is a number here, from RHF's state
     const montoForConversion = watchedMonto; 
 
     if (montoForConversion !== undefined && montoForConversion > 0 && watchedMontoMoneda) {
@@ -184,9 +183,8 @@ export function AddProductModal() {
   useEffect(() => {
     if (isAddProductModalOpen) {
       const defaultCorreo = user?.email || '';
-      // Default values for RHF must match SolicitudFormData type
       const initialValues: SolicitudFormData = {
-        monto: 0, // Field must be a number as per SolicitudFormData
+        monto: 0, 
         montoMoneda: 'cordoba',
         cantidadEnLetras: '',
         consignatario: '',
@@ -223,22 +221,15 @@ export function AddProductModal() {
       setSelectedAccountName(null); 
 
       if (editingSolicitud) {
-        let numMontoForForm: number;
-        if (typeof editingSolicitud.monto === 'string') {
-          numMontoForForm = parseFloat(editingSolicitud.monto.replace(/,/g, ''));
-        } else if (typeof editingSolicitud.monto === 'number') {
-          numMontoForForm = editingSolicitud.monto;
-        } else {
-          numMontoForForm = 0; // Default if null or undefined
-        }
-        if (isNaN(numMontoForForm)) {
-            numMontoForForm = 0; // Default if parsing failed
-        }
+        // editingSolicitud.monto is number | undefined from SolicitudData
+        // For the form, RHF expects a number for 'monto' based on Zod schema
+        const montoForForm = editingSolicitud.monto ?? 0;
+
 
         const populatedEditingSolicitud: SolicitudFormData = {
           ...initialValues, 
           ...editingSolicitud, 
-          monto: numMontoForForm, 
+          monto: montoForForm, 
           correo: editingSolicitud.correo || defaultCorreo, 
           soporte: editingSolicitud.soporte ?? false, 
           pagoServicios: editingSolicitud.pagoServicios ?? false,
@@ -252,8 +243,8 @@ export function AddProductModal() {
         setShowMonedaCuentaOtros(editingSolicitud.monedaCuenta === 'Otros');
         setShowOtrosTipoServicio(editingSolicitud.tipoServicio === 'OTROS');
 
-        if (numMontoForForm > 0 && populatedEditingSolicitud.montoMoneda) {
-          const letras = numeroALetras(numMontoForForm, populatedEditingSolicitud.montoMoneda);
+        if (montoForForm > 0 && populatedEditingSolicitud.montoMoneda) {
+          const letras = numeroALetras(montoForForm, populatedEditingSolicitud.montoMoneda);
           form.setValue('cantidadEnLetras', letras, { shouldValidate: false }); 
         } else {
             form.setValue('cantidadEnLetras', '', { shouldValidate: false });
@@ -286,11 +277,16 @@ export function AddProductModal() {
 
 function onSubmit(data: SolicitudFormData) {
     // data.monto is already a number here due to Zod schema processing
+    // and RHF managing the form state as number for 'monto'.
     const solicitudDataToSave: Omit<SolicitudData, 'id'> & { id?: string } = {
-        ...data, // data already conforms to SolicitudFormData, where monto is number
-        monto: data.monto, // Ensure data.monto is used directly
+        ...data, // data already conforms to SolicitudFormData
+        monto: data.monto, // data.monto is number here
         soporte: data.soporte ?? false,
         pagoServicios: data.pagoServicios ?? false,
+        // Ensure enum types are correctly cast if necessary, though Zod should handle this.
+        montoMoneda: data.montoMoneda as SolicitudData['montoMoneda'],
+        banco: data.banco as SolicitudData['banco'],
+        monedaCuenta: data.monedaCuenta as SolicitudData['monedaCuenta'],
         tipoServicio: data.tipoServicio as SolicitudData['tipoServicio'], 
     };
 
@@ -382,7 +378,7 @@ function onSubmit(data: SolicitudFormData) {
 
                 <div className="space-y-4 p-4 border rounded-md">
                   <h4 className="text-md font-medium text-primary mb-2">Detalles del Monto</h4>
-                  <FormField control={form.control} name="monto" render={({ field }) => ( // field.value is number here
+                  <FormField control={form.control} name="monto" render={({ field }) => ( 
                     <FormItem>
                       <FormLabel className="flex items-center text-sm text-foreground">
                         <DollarSign className="mr-2 h-4 w-4 text-primary" />
@@ -391,18 +387,14 @@ function onSubmit(data: SolicitudFormData) {
                       <div className="flex gap-2 items-center">
                         <FormControl>
                           <Input
-                            type="text" // Input is text for user experience with decimals/formatting
+                            type="text" 
                             inputMode="decimal"
                             placeholder="0.00"
                             {...field}
-                            value={field.value === 0 && !form.getFieldState("monto").isDirty ? '' : String(field.value ?? '')} // Display as string, handle 0 for initial display
+                            value={field.value === 0 && !form.getFieldState("monto").isDirty ? '' : String(field.value ?? '')} 
                             onChange={(e) => {
                               const sanitized = sanitizeMontoInput(e.target.value);
-                              // RHF expects a number for this field due to Zod schema,
-                              // but we pass string for Zod's preprocess to handle.
-                              // Or, we parse here and pass number to RHF.
-                              // Let's rely on Zod's preprocess.
-                              field.onChange(sanitized); 
+                              field.onChange(sanitized); // Pass string to Zod preprocess
                             }}
                             className="w-2/3"
                           />

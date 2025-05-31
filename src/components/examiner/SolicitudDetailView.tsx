@@ -17,7 +17,7 @@ const DetailItem: React.FC<{ label: string; value?: string | number | null | boo
   let displayValue: string;
   if (typeof value === 'boolean') {
     displayValue = value ? 'Sí' : 'No';
-  } else if (value && value instanceof Date) { // Check if value is not null/undefined before instanceof
+  } else if (value && typeof value === 'object' && value instanceof Date) { 
     displayValue = format(value, "PPP", { locale: es });
   } else {
     displayValue = String(value ?? 'N/A');
