@@ -206,7 +206,7 @@ export default function SolicitudDetailPage() {
     );
   }
 
-  if (!displaySolicitud || !displayInitialData || !(displayInitialData.date instanceof Date)) {
+  if (!displaySolicitud || !displayInitialData || !(displayInitialData.date && displayInitialData.date instanceof Date)) {
     return (
       <AppShell>
         <div className="flex flex-col items-center justify-center h-screen text-center">

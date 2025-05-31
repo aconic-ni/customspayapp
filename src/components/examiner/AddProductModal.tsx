@@ -81,8 +81,8 @@ export function AddProductModal() {
 
   const form = useForm<SolicitudFormData>({
     resolver: zodResolver(solicitudSchema),
-    defaultValues: {
-      monto: undefined, // Explicitly undefined
+    defaultValues: { // These must match SolicitudFormData, where monto is number
+      monto: 0, 
       montoMoneda: 'cordoba',
       cantidadEnLetras: '',
       consignatario: '',
@@ -121,14 +121,14 @@ export function AddProductModal() {
   const watchedMonedaCuenta = form.watch("monedaCuenta");
   const watchedImpuestosPagados = form.watch("impuestosPagadosCliente");
   const watchedConstanciasNoRetencion = form.watch("constanciasNoRetencion");
-  const watchedMonto = form.watch("monto");
+  const watchedMonto = form.watch("monto"); // This will be a number from RHF state
   const watchedMontoMoneda = form.watch("montoMoneda");
   const watchedPagoServicios = form.watch("pagoServicios");
   const watchedTipoServicio = form.watch("tipoServicio");
 
   const sanitizeMontoInput = (inputValue: string | number | undefined): string => {
     if (inputValue === undefined || inputValue === null) return '';
-    let value = String(inputValue); // Ensure it's a string
+    let value = String(inputValue); 
     value = value.replace(/[^\d.]/g, "");
 
     const dotIndex = value.indexOf('.');
@@ -149,23 +149,12 @@ export function AddProductModal() {
 
 
   useEffect(() => {
-    let montoForConversion: number | undefined = undefined;
-    if (watchedMonto !== undefined) {
-        const montoStr = String(watchedMonto); // Ensure watchedMonto is treated as a string for replacement
-        const parsed = parseFloat(montoStr.replace(/,/g, ''));
-        if (!isNaN(parsed)) {
-            montoForConversion = parsed;
-        }
-    }
+    // watchedMonto is a number here, from RHF's state
+    const montoForConversion = watchedMonto; 
 
-    if (montoForConversion !== undefined && watchedMontoMoneda) {
-      const montoNumero = Number(montoForConversion);
-      if (!isNaN(montoNumero) && montoNumero > 0) {
-        const letras = numeroALetras(montoNumero, watchedMontoMoneda);
-        form.setValue('cantidadEnLetras', letras, { shouldValidate: true });
-      } else {
-        form.setValue('cantidadEnLetras', '', { shouldValidate: true });
-      }
+    if (montoForConversion !== undefined && montoForConversion > 0 && watchedMontoMoneda) {
+      const letras = numeroALetras(montoForConversion, watchedMontoMoneda);
+      form.setValue('cantidadEnLetras', letras, { shouldValidate: true });
     } else {
       form.setValue('cantidadEnLetras', '', { shouldValidate: true });
     }
@@ -195,8 +184,9 @@ export function AddProductModal() {
   useEffect(() => {
     if (isAddProductModalOpen) {
       const defaultCorreo = user?.email || '';
+      // Default values for RHF must match SolicitudFormData type
       const initialValues: SolicitudFormData = {
-        monto: undefined, 
+        monto: 0, // Field must be a number as per SolicitudFormData
         montoMoneda: 'cordoba',
         cantidadEnLetras: '',
         consignatario: '',
@@ -233,14 +223,22 @@ export function AddProductModal() {
       setSelectedAccountName(null); 
 
       if (editingSolicitud) {
-        const montoAsStringOrUndefined = editingSolicitud.monto !== undefined && editingSolicitud.monto !== null
-          ? String(editingSolicitud.monto)
-          : undefined; // Ensure it's undefined if monto is not set
+        let numMontoForForm: number;
+        if (typeof editingSolicitud.monto === 'string') {
+          numMontoForForm = parseFloat(editingSolicitud.monto.replace(/,/g, ''));
+        } else if (typeof editingSolicitud.monto === 'number') {
+          numMontoForForm = editingSolicitud.monto;
+        } else {
+          numMontoForForm = 0; // Default if null or undefined
+        }
+        if (isNaN(numMontoForForm)) {
+            numMontoForForm = 0; // Default if parsing failed
+        }
 
         const populatedEditingSolicitud: SolicitudFormData = {
           ...initialValues, 
           ...editingSolicitud, 
-          monto: montoAsStringOrUndefined, 
+          monto: numMontoForForm, 
           correo: editingSolicitud.correo || defaultCorreo, 
           soporte: editingSolicitud.soporte ?? false, 
           pagoServicios: editingSolicitud.pagoServicios ?? false,
@@ -254,14 +252,12 @@ export function AddProductModal() {
         setShowMonedaCuentaOtros(editingSolicitud.monedaCuenta === 'Otros');
         setShowOtrosTipoServicio(editingSolicitud.tipoServicio === 'OTROS');
 
-        const montoNumeroForEdit = Number(editingSolicitud.monto);
-        if (!isNaN(montoNumeroForEdit) && montoNumeroForEdit > 0 && populatedEditingSolicitud.montoMoneda) {
-          const letras = numeroALetras(montoNumeroForEdit, populatedEditingSolicitud.montoMoneda);
+        if (numMontoForForm > 0 && populatedEditingSolicitud.montoMoneda) {
+          const letras = numeroALetras(numMontoForForm, populatedEditingSolicitud.montoMoneda);
           form.setValue('cantidadEnLetras', letras, { shouldValidate: false }); 
         } else {
             form.setValue('cantidadEnLetras', '', { shouldValidate: false });
         }
-        // Pre-select account name if number matches
         const matchingAccount = accountRegistryData.find(acc => acc.accountNumber === editingSolicitud.numeroCuenta);
         if (matchingAccount) {
             setSelectedAccountName(matchingAccount.name);
@@ -289,19 +285,13 @@ export function AddProductModal() {
   };
 
 function onSubmit(data: SolicitudFormData) {
-    const sanitizedMonto = data.monto !== undefined && data.monto !== null ? parseFloat(String(data.monto).replace(/,/g, '')) : undefined;
-
-    if (sanitizedMonto === undefined || isNaN(sanitizedMonto)) {
-        form.setError("monto", { type: "manual", message: "Monto es requerido y debe ser un número válido." });
-        return;
-    }
-
+    // data.monto is already a number here due to Zod schema processing
     const solicitudDataToSave: Omit<SolicitudData, 'id'> & { id?: string } = {
-        ...data,
-        monto: sanitizedMonto,
+        ...data, // data already conforms to SolicitudFormData, where monto is number
+        monto: data.monto, // Ensure data.monto is used directly
         soporte: data.soporte ?? false,
         pagoServicios: data.pagoServicios ?? false,
-        tipoServicio: data.tipoServicio as SolicitudData['tipoServicio'], // Cast to ensure type compatibility
+        tipoServicio: data.tipoServicio as SolicitudData['tipoServicio'], 
     };
 
     if (editingSolicitud && editingSolicitud.id) {
@@ -392,7 +382,7 @@ function onSubmit(data: SolicitudFormData) {
 
                 <div className="space-y-4 p-4 border rounded-md">
                   <h4 className="text-md font-medium text-primary mb-2">Detalles del Monto</h4>
-                  <FormField control={form.control} name="monto" render={({ field }) => (
+                  <FormField control={form.control} name="monto" render={({ field }) => ( // field.value is number here
                     <FormItem>
                       <FormLabel className="flex items-center text-sm text-foreground">
                         <DollarSign className="mr-2 h-4 w-4 text-primary" />
@@ -401,13 +391,17 @@ function onSubmit(data: SolicitudFormData) {
                       <div className="flex gap-2 items-center">
                         <FormControl>
                           <Input
-                            type="text"
+                            type="text" // Input is text for user experience with decimals/formatting
                             inputMode="decimal"
                             placeholder="0.00"
                             {...field}
-                            value={field.value ?? ''} 
+                            value={field.value === 0 && !form.getFieldState("monto").isDirty ? '' : String(field.value ?? '')} // Display as string, handle 0 for initial display
                             onChange={(e) => {
                               const sanitized = sanitizeMontoInput(e.target.value);
+                              // RHF expects a number for this field due to Zod schema,
+                              // but we pass string for Zod's preprocess to handle.
+                              // Or, we parse here and pass number to RHF.
+                              // Let's rely on Zod's preprocess.
                               field.onChange(sanitized); 
                             }}
                             className="w-2/3"

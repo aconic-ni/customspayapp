@@ -79,7 +79,7 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
     return s.monedaCuenta;
   };
 
-  if (!solicitud || !initialData || !(initialData.date instanceof Date)) {
+  if (!solicitud || !initialData || !(initialData.date && initialData.date instanceof Date)) {
     return (
       <Card className="w-full custom-shadow">
         <CardHeader>
