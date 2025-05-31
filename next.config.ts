@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    unoptimized: true, // Required for static exports like GitHub Pages
     remotePatterns: [
       {
         protocol: 'https',
@@ -19,11 +20,11 @@ const nextConfig: NextConfig = {
     ],
   },
   // For GitHub Pages, if deploying to a subpath like username.github.io/repo-name:
+  // The actions/configure-pages@v5 action in the workflow should handle basePath and assetPrefix automatically.
   // basePath: '/repo-name',
   // assetPrefix: '/repo-name/',
-  // output: 'export', // Add this for static site generation for GitHub Pages, ensure all routes are compatible.
-  // For now, keeping it without 'export' to ensure Firebase client-side logic works smoothly.
-  // If a completely static build is required, ensure all Firebase interactions are strictly client-side.
+  output: 'export', // Add this for static site generation for GitHub Pages
 };
 
 export default nextConfig;
+
