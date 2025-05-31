@@ -38,15 +38,10 @@ export function AppHeader() {
       <div className="container mx-auto px-4 py-3 max-w-7xl">
         <div className="flex justify-between items-center">
           <div className="flex flex-col items-start">
-            {isDatabaseAuthorized ? (
-              <Link href="/database" className="flex items-center gap-2">
-                {renderAppIdentity()}
-              </Link>
-            ) : (
-              <Link href="/examiner" className="flex items-center gap-2">
-                {renderAppIdentity()}
-              </Link>
-            )}
+            {/* El nombre de la aplicación y el icono ya no son un enlace */}
+            <div className="flex items-center gap-2">
+              {renderAppIdentity()}
+            </div>
             {user && !loading && (
               <div className="flex w-full items-center justify-center gap-2 text-sm text-muted-foreground mt-1 md:hidden">
                 <UserCircle className="h-5 w-5" />
