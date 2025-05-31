@@ -639,15 +639,28 @@ export default function DatabasePage() {
         if (!querySnapshot.empty) {
           let data = querySnapshot.docs.map(docSnap => { 
             const docData = docSnap.data();
-            const examDate = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : new Date());
-            const savedAt = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : new Date());
+            
+            let examDateValue: Date | undefined;
+            if (docData.examDate instanceof FirestoreTimestamp) {
+                examDateValue = docData.examDate.toDate();
+            } else if (docData.examDate instanceof Date) { // Should not happen from Firestore directly
+                examDateValue = docData.examDate;
+            }
+
+            let savedAtValue: Date | undefined;
+            if (docData.savedAt instanceof FirestoreTimestamp) {
+                savedAtValue = docData.savedAt.toDate();
+            } else if (docData.savedAt instanceof Date) { // Should not happen
+                savedAtValue = docData.savedAt;
+            }
+            
             const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
 
             return {
               ...docData,
               solicitudId: docSnap.id,
-              examDate: examDate,
-              savedAt: savedAt,
+              examDate: examDateValue,
+              savedAt: savedAtValue,
               paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
               examNe: docData.examNe || '',
               examReference: docData.examReference || null,
@@ -960,5 +973,3 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
-
-    

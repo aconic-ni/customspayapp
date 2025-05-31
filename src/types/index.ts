@@ -70,7 +70,7 @@ export interface SolicitudRecord {
   examNe: string;
   examReference: string | null;
   examManager: string;
-  examDate: Date; // Changed from Timestamp | Date
+  examDate: Date | undefined; // Changed from Date
   examRecipient: string;
 
   solicitudId: string;
@@ -116,11 +116,11 @@ export interface SolicitudRecord {
   correo: string | null;
   observation: string | null;
 
-  savedAt: Date; // Changed from Timestamp | Date
+  savedAt: Date | undefined; // Changed from Date
   savedBy: string | null;
 
   paymentStatus?: string;
-  paymentStatusLastUpdatedAt?: Date; // Changed from Timestamp | Date
+  paymentStatusLastUpdatedAt?: Date;
   paymentStatusLastUpdatedBy?: string;
 }
 
