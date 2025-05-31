@@ -384,72 +384,128 @@ export default function DatabasePage() {
 
   const displayedSolicitudes = useMemo(() => {
     if (!fetchedSolicitudes) return null;
-    let filtered = fetchedSolicitudes;
   
-    if (filterSolicitudIdInput) {
-      filtered = filtered.filter(s =>
-        s.solicitudId.toLowerCase().includes(filterSolicitudIdInput.toLowerCase())
+    let accumulatedData = [...fetchedSolicitudes]; // Start with a copy of fetched data
+  
+    // Filter by Solicitud ID
+    if (filterSolicitudIdInput.trim()) {
+      const filtered = accumulatedData.filter(s =>
+        s.solicitudId.toLowerCase().includes(filterSolicitudIdInput.toLowerCase().trim())
       );
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing to accumulatedData for this specific filter
+      }
     }
   
-    if (filterNEInput) {
-      filtered = filtered.filter(s =>
-        s.examNe.toLowerCase().includes(filterNEInput.toLowerCase())
+    // Filter by NE
+    if (filterNEInput.trim()) {
+      const filtered = accumulatedData.filter(s =>
+        s.examNe.toLowerCase().includes(filterNEInput.toLowerCase().trim())
       );
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing
+      }
     }
   
-    if (filterEstadoPagoInput) {
-      filtered = filtered.filter(s => {
+    // Filter by Estado de Pago
+    if (filterEstadoPagoInput.trim()) {
+      const filtered = accumulatedData.filter(s => {
         const statusText = s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente";
-        return statusText.includes(filterEstadoPagoInput.toLowerCase());
+        return statusText.includes(filterEstadoPagoInput.toLowerCase().trim());
       });
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing
+      }
     }
   
-    if (filterFechaSolicitudInput) {
-      filtered = filtered.filter(s => {
+    // Filter by Fecha de Solicitud
+    if (filterFechaSolicitudInput.trim()) {
+      const filtered = accumulatedData.filter(s => {
         const dateText = s.examDate && s.examDate instanceof Date
           ? format(s.examDate, "PPP", { locale: es })
           : 'N/A';
-        return dateText.toLowerCase().includes(filterFechaSolicitudInput.toLowerCase());
+        return dateText.toLowerCase().includes(filterFechaSolicitudInput.toLowerCase().trim());
       });
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing
+      }
     }
   
-    if (filterMontoInput) {
-      filtered = filtered.filter(s => {
+    // Filter by Monto
+    if (filterMontoInput.trim()) {
+      const filtered = accumulatedData.filter(s => {
         const montoText = formatCurrencyFetched(s.monto ?? undefined, s.montoMoneda || undefined);
-        return montoText.toLowerCase().includes(filterMontoInput.toLowerCase());
+        return montoText.toLowerCase().includes(filterMontoInput.toLowerCase().trim());
       });
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing
+      }
     }
   
-    if (filterConsignatarioInput) {
-      filtered = filtered.filter(s =>
-        (s.consignatario || '').toLowerCase().includes(filterConsignatarioInput.toLowerCase())
+    // Filter by Consignatario
+    if (filterConsignatarioInput.trim()) {
+      const filtered = accumulatedData.filter(s =>
+        (s.consignatario || '').toLowerCase().includes(filterConsignatarioInput.toLowerCase().trim())
       );
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing
+      }
     }
   
-    if (filterDeclaracionInput) {
-      filtered = filtered.filter(s =>
-        (s.declaracionNumero || '').toLowerCase().includes(filterDeclaracionInput.toLowerCase())
+    // Filter by Declaración
+    if (filterDeclaracionInput.trim()) {
+      const filtered = accumulatedData.filter(s =>
+        (s.declaracionNumero || '').toLowerCase().includes(filterDeclaracionInput.toLowerCase().trim())
       );
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing
+      }
     }
   
-    if (filterUsuarioDeInput) {
-      filtered = filtered.filter(s =>
-        (s.examManager || '').toLowerCase().includes(filterUsuarioDeInput.toLowerCase())
+    // Filter by Usuario (De)
+    if (filterUsuarioDeInput.trim()) {
+      const filtered = accumulatedData.filter(s =>
+        (s.examManager || '').toLowerCase().includes(filterUsuarioDeInput.toLowerCase().trim())
       );
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing
+      }
     }
   
-    if (filterGuardadoPorInput && user?.role !== 'autorevisor') {
-      filtered = filtered.filter(s =>
-        (s.savedBy || '').toLowerCase().includes(filterGuardadoPorInput.toLowerCase())
-      );
-    } else if (user?.role === 'autorevisor' && user?.email) {
-        filtered = filtered.filter(s =>
+    // Filter by Guardado Por (with role logic)
+    if (user?.role === 'autorevisor' && user?.email) {
+      // For autorevisor, this filter is mandatory and can empty the list
+      accumulatedData = accumulatedData.filter(s =>
         (s.savedBy || '').toLowerCase() === user.email!.toLowerCase()
       );
+    } else if (filterGuardadoPorInput.trim()) {
+      const filtered = accumulatedData.filter(s =>
+        (s.savedBy || '').toLowerCase().includes(filterGuardadoPorInput.toLowerCase().trim())
+      );
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } else {
+        // If filter yields no results, do nothing
+      }
     }
   
-    return filtered;
+    return accumulatedData;
   }, [
     fetchedSolicitudes,
     filterSolicitudIdInput,
@@ -643,14 +699,14 @@ export default function DatabasePage() {
             let examDateValue: Date | undefined;
             if (docData.examDate instanceof FirestoreTimestamp) {
                 examDateValue = docData.examDate.toDate();
-            } else if (docData.examDate instanceof Date) { // Should not happen from Firestore directly
+            } else if (docData.examDate instanceof Date) { 
                 examDateValue = docData.examDate;
             }
 
             let savedAtValue: Date | undefined;
             if (docData.savedAt instanceof FirestoreTimestamp) {
                 savedAtValue = docData.savedAt.toDate();
-            } else if (docData.savedAt instanceof Date) { // Should not happen
+            } else if (docData.savedAt instanceof Date) { 
                 savedAtValue = docData.savedAt;
             }
             
