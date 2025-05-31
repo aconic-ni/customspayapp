@@ -18,11 +18,11 @@ import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 
-const DetailItem: React.FC<{ label: string; value?: string | number | null | boolean; icon?: React.ElementType; className?: string }> = ({ label, value, icon: Icon, className }) => {
+const DetailItem: React.FC<{ label: string; value?: string | number | null | boolean | Date; icon?: React.ElementType; className?: string }> = ({ label, value, icon: Icon, className }) => {
   let displayValue: string;
   if (typeof value === 'boolean') {
     displayValue = value ? 'Sí' : 'No';
-  } else if (value && typeof value === 'object' && value instanceof Date) { 
+  } else if (value instanceof Date) { 
     displayValue = format(value, "PPP", { locale: es });
   } else {
     displayValue = String(value ?? 'N/A');
@@ -209,7 +209,7 @@ export default function SolicitudDetailPage() {
     );
   }
 
-  if (!displaySolicitud || !displayInitialData || !(displayInitialData.date && displayInitialData.date instanceof Date)) {
+  if (!displaySolicitud || !displayInitialData || !(displayInitialData.date instanceof Date)) {
     return (
       <AppShell>
         <div className="flex flex-col items-center justify-center h-screen text-center">
@@ -270,7 +270,7 @@ export default function SolicitudDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-0">
                   <DetailItem label="A" value={displayInitialData.recipient} icon={Send} />
                   <DetailItem label="De (Usuario)" value={displayInitialData.manager} icon={User} />
-                  <DetailItem label="Fecha de Solicitud" value={displayInitialData.date ? format(new Date(displayInitialData.date), "PPP", { locale: es }) : 'N/A'} icon={CalendarDays} />
+                  <DetailItem label="Fecha de Solicitud" value={displayInitialData.date} icon={CalendarDays} />
                   <DetailItem label="NE (Tracking NX1)" value={displayInitialData.ne} icon={Info} />
                   <DetailItem label="Referencia" value={displayInitialData.reference || 'N/A'} icon={FileText} className="md:col-span-2"/>
                 </div>

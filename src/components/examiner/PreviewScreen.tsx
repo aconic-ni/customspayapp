@@ -14,11 +14,14 @@ import { cn } from '@/lib/utils';
 // PDF Download is removed
 
 
-const PreviewDetailItem: React.FC<{ label: string; value?: string | number | null | boolean, icon?: React.ElementType, className?: string }> = ({ label, value, icon: Icon, className }) => {
+const PreviewDetailItem: React.FC<{ label: string; value?: string | number | null | boolean | Date, icon?: React.ElementType, className?: string }> = ({ label, value, icon: Icon, className }) => {
   let displayValue: string;
   if (typeof value === 'boolean') {
     displayValue = value ? 'Sí' : 'No';
-  } else {
+  } else if (value instanceof Date) {
+    displayValue = format(value, "PPP", { locale: es });
+  }
+  else {
     displayValue = String(value ?? 'N/A');
   }
 
@@ -114,7 +117,7 @@ export function PreviewScreen() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-secondary/30 p-4 rounded-md shadow-sm text-sm">
             <PreviewDetailItem label="A (Destinatario)" value={initialContextData.recipient} icon={Send} />
             <PreviewDetailItem label="De (Usuario)" value={initialContextData.manager} icon={User} />
-            <PreviewDetailItem label="Fecha de Solicitud" value={initialContextData.date && initialContextData.date instanceof Date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'N/A'} icon={CalendarDays} />
+            <PreviewDetailItem label="Fecha de Solicitud" value={initialContextData.date} icon={CalendarDays} />
             <PreviewDetailItem label="NE (Tracking NX1)" value={initialContextData.ne} icon={Info} />
             <PreviewDetailItem label="Referencia" value={initialContextData.reference || 'N/A'} icon={FileText} />
           </div>
