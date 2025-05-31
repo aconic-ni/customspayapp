@@ -43,14 +43,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
-import ClientPage from './Solicitud/[id]/ClientPage'; // Importar ClientPage
+import DatabaseSolicitudDetailView from '@/components/database/DatabaseSolicitudDetailView';
 
 type SearchType = "ne" | "solicitudId" | "manager" | "dateToday" | "dateSpecific" | "dateRange" | "dateCurrentMonth";
 
 const formatCurrencyFetched = (amount?: number | string | null, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
-    const num = Number(amount); // Number(null) is 0, Number('') is 0
-    if (isNaN(num) && typeof amount === 'string' && amount.trim() === '') return 'N/A'; // Catch empty string specifically if Number('') is not desired
+    const num = Number(amount); 
+    if (isNaN(num) && typeof amount === 'string' && amount.trim() === '') return 'N/A'; 
     if (isNaN(num)) return String(amount);
 
     let prefix = '';
@@ -407,7 +407,7 @@ export default function DatabasePage() {
   
     if (filterFechaSolicitudInput) {
       filtered = filtered.filter(s => {
-        const dateText = s.examDate instanceof Date
+        const dateText = s.examDate && s.examDate instanceof Date
           ? format(s.examDate, "PPP", { locale: es })
           : 'N/A';
         return dateText.toLowerCase().includes(filterFechaSolicitudInput.toLowerCase());
@@ -490,7 +490,7 @@ export default function DatabasePage() {
 
       await updateDoc(docRef, {
         paymentStatus: newStatus,
-        paymentStatusLastUpdatedAt: serverTimestamp(), // Firestore will convert this to its Timestamp
+        paymentStatusLastUpdatedAt: serverTimestamp(), 
         paymentStatusLastUpdatedBy: user.email,
       });
       toast({ title: "Éxito", description: `Estado de pago actualizado para ${solicitudId}.` });
@@ -499,7 +499,7 @@ export default function DatabasePage() {
           s.solicitudId === solicitudId
             ? { ...s,
                 paymentStatus: newStatus || undefined, 
-                paymentStatusLastUpdatedAt: new Date(), // Update client-side with JS Date
+                paymentStatusLastUpdatedAt: new Date(), 
                 paymentStatusLastUpdatedBy: user.email!
               }
             : s
@@ -639,10 +639,9 @@ export default function DatabasePage() {
         if (!querySnapshot.empty) {
           let data = querySnapshot.docs.map(docSnap => { 
             const docData = docSnap.data();
-            // Convert Firestore Timestamps to JS Date objects for client-side use
-            const examDate = (docData.examDate as FirestoreTimestamp)?.toDate();
-            const savedAt = (docData.savedAt as FirestoreTimestamp)?.toDate();
-            const paymentStatusLastUpdatedAt = (docData.paymentStatusLastUpdatedAt as FirestoreTimestamp)?.toDate();
+            const examDate = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : new Date());
+            const savedAt = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : new Date());
+            const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
 
             return {
               ...docData,
@@ -650,7 +649,6 @@ export default function DatabasePage() {
               examDate: examDate,
               savedAt: savedAt,
               paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
-              // Ensure all other fields match SolicitudRecord
               examNe: docData.examNe || '',
               examReference: docData.examReference || null,
               examManager: docData.examManager || '',
@@ -864,7 +862,7 @@ export default function DatabasePage() {
                 <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Búsqueda
              </Button>
           </div>
-          <ClientPage id={solicitudToViewInline.solicitudId} onBackToList={handleBackToTable} isInlineView={true} />
+          <DatabaseSolicitudDetailView id={solicitudToViewInline.solicitudId} onBackToList={handleBackToTable} isInlineView={true} />
         </div>
       </AppShell>
     );
@@ -962,3 +960,5 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
+
+    
