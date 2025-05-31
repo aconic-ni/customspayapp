@@ -46,6 +46,8 @@ const CheckboxDetailItem: React.FC<{ label: string; checked?: boolean; subLabel?
   </div>
 );
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 export default function DatabaseSolicitudDetailView({ id, onBackToList, isInlineView }: DatabaseSolicitudDetailViewProps) {
   const [solicitud, setSolicitud] = useState<SolicitudRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,8 +64,8 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
           if (docSnap.exists()) {
             const data = docSnap.data();
             // Perform robust conversion from Firestore data to SolicitudRecord
-            const examDate = data.examDate instanceof FirestoreTimestamp ? data.examDate.toDate() : (data.examDate instanceof Date ? data.examDate : new Date());
-            const savedAt = data.savedAt instanceof FirestoreTimestamp ? data.savedAt.toDate() : (data.savedAt instanceof Date ? data.savedAt : new Date());
+            const examDate = data.examDate instanceof FirestoreTimestamp ? data.examDate.toDate() : (data.examDate instanceof Date ? data.examDate : undefined);
+            const savedAt = data.savedAt instanceof FirestoreTimestamp ? data.savedAt.toDate() : (data.savedAt instanceof Date ? data.savedAt : undefined);
             const paymentStatusLastUpdatedAt = data.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? data.paymentStatusLastUpdatedAt.toDate() : (data.paymentStatusLastUpdatedAt instanceof Date ? data.paymentStatusLastUpdatedAt : undefined);
 
             setSolicitud({
@@ -178,7 +180,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
       <Card className="w-full max-w-4xl mx-auto custom-shadow card-print-styles">
         <CardContent className="pt-4">
            <Image
-                src="/imagenes/HEADERSOLICITUDDETAIL.svg"
+                src={`${basePath}/imagenes/HEADERSOLICITUDDETAIL.svg`}
                 alt="Header Solicitud Detail"
                 width={800}
                 height={100}
@@ -293,7 +295,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
           </div>
 
           <Image
-              src="/imagenes/FOOTERSOLICITUDETAIL.svg"
+              src={`${basePath}/imagenes/FOOTERSOLICITUDETAIL.svg`}
               alt="Footer Solicitud Detail"
               width={800}
               height={100}
