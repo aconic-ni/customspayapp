@@ -129,7 +129,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     window.print();
   };
 
-  const formatCurrency = (amount?: number | string, currency?: string) => {
+  const formatCurrency = (amount?: number | string | null, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
     const num = Number(amount);
     if (isNaN(num)) return String(amount);
@@ -316,3 +316,4 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     </div>
   );
 }
+
