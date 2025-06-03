@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, User, FileText as FileTextIcon, ListCollapse, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, or } from 'firebase/firestore';
 import type { SolicitudRecord } from '@/types';
@@ -49,8 +49,8 @@ type SearchType = "ne" | "solicitudId" | "manager" | "dateToday" | "dateSpecific
 
 const formatCurrencyFetched = (amount?: number | string | null, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
-    const num = Number(amount); 
-    if (isNaN(num) && typeof amount === 'string' && amount.trim() === '') return 'N/A'; 
+    const num = Number(amount);
+    if (isNaN(num) && typeof amount === 'string' && amount.trim() === '') return 'N/A';
     if (isNaN(num)) return String(amount);
 
     let prefix = '';
@@ -59,6 +59,21 @@ const formatCurrencyFetched = (amount?: number | string | null, currency?: strin
     else if (currency === 'euro') prefix = '€';
     return `${prefix}${num.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
+
+const renderSolicitudStatusBadges = (solicitud: SolicitudRecord) => {
+  const badges = [];
+  if (solicitud.documentosAdjuntos) badges.push(<Badge key="docs" variant="outline" className="bg-blue-100 text-blue-700 whitespace-nowrap text-xs">Docs Adjuntos</Badge>);
+  if (solicitud.soporte) badges.push(<Badge key="soporte" variant="outline" className="bg-yellow-100 text-yellow-700 whitespace-nowrap text-xs">Soporte</Badge>);
+  if (solicitud.impuestosPendientesCliente) badges.push(<Badge key="impuestos" variant="outline" className="bg-red-100 text-red-700 whitespace-nowrap text-xs">Imp. Pendientes</Badge>);
+  if (solicitud.constanciasNoRetencion) badges.push(<Badge key="retencion" variant="outline" className="bg-purple-100 text-purple-700 whitespace-nowrap text-xs">Const. No Ret.</Badge>);
+  if (solicitud.pagoServicios) badges.push(<Badge key="servicios" variant="outline" className="bg-teal-100 text-teal-700 whitespace-nowrap text-xs">Pago Serv.</Badge>);
+
+  if (badges.length === 0) {
+    return <Badge variant="secondary" className="text-xs">Sin Estados</Badge>;
+  }
+  return <div className="flex flex-wrap gap-1">{badges}</div>;
+};
+
 
 interface SearchResultsTableProps {
   solicitudes: SolicitudRecord[];
@@ -82,10 +97,12 @@ interface SearchResultsTableProps {
   setFilterConsignatarioInput: (value: string) => void;
   filterDeclaracionInput: string;
   setFilterDeclaracionInput: (value: string) => void;
-  filterUsuarioDeInput: string;
-  setFilterUsuarioDeInput: (value: string) => void;
+  filterReferenciaInput: string;
+  setFilterReferenciaInput: (value: string) => void;
   filterGuardadoPorInput: string;
   setFilterGuardadoPorInput: (value: string) => void;
+  filterEstadoSolicitudInput: string; // Added
+  setFilterEstadoSolicitudInput: (value: string) => void; // Added
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -110,10 +127,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   setFilterConsignatarioInput,
   filterDeclaracionInput,
   setFilterDeclaracionInput,
-  filterUsuarioDeInput,
-  setFilterUsuarioDeInput,
+  filterReferenciaInput,
+  setFilterReferenciaInput,
   filterGuardadoPorInput,
   setFilterGuardadoPorInput,
+  filterEstadoSolicitudInput, // Added
+  setFilterEstadoSolicitudInput, // Added
 }) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -151,10 +170,20 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
             <TableHeader className="bg-secondary/50">
               <TableRow>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                  Estado Solicitud
+                  <Input
+                    type="text"
+                    placeholder="Filtrar Estado Sol..."
+                    value={filterEstadoSolicitudInput}
+                    onChange={(e) => setFilterEstadoSolicitudInput(e.target.value)}
+                    className="mt-1 h-8 text-xs"
+                  />
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado de Pago
                   <Input
                     type="text"
-                    placeholder="Filtrar Estado..."
+                    placeholder="Filtrar Estado Pago..."
                     value={filterEstadoPagoInput}
                     onChange={(e) => setFilterEstadoPagoInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
@@ -221,12 +250,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   />
                 </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Usuario (De)
+                  Referencia
                   <Input
                     type="text"
-                    placeholder="Filtrar Usuario (De)..."
-                    value={filterUsuarioDeInput}
-                    onChange={(e) => setFilterUsuarioDeInput(e.target.value)}
+                    placeholder="Filtrar Referencia..."
+                    value={filterReferenciaInput}
+                    onChange={(e) => setFilterReferenciaInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
@@ -248,6 +277,9 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
             <TableBody className="bg-card divide-y divide-border">
               {solicitudes.map((solicitud) => (
                 <TableRow key={solicitud.solicitudId} className="hover:bg-muted/50">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
+                    {renderSolicitudStatusBadges(solicitud)}
+                  </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                     {currentUserRole === 'calificador' ? (
                       <div className="flex items-center space-x-2">
@@ -316,7 +348,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{formatCurrencyFetched(solicitud.monto ?? undefined, solicitud.montoMoneda || undefined)}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.consignatario || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.declaracionNumero || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examManager}</TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examReference || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.savedBy || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                     <Button
@@ -365,8 +397,9 @@ export default function DatabasePage() {
   const [filterMontoInput, setFilterMontoInput] = useState('');
   const [filterConsignatarioInput, setFilterConsignatarioInput] = useState('');
   const [filterDeclaracionInput, setFilterDeclaracionInput] = useState('');
-  const [filterUsuarioDeInput, setFilterUsuarioDeInput] = useState('');
+  const [filterReferenciaInput, setFilterReferenciaInput] = useState('');
   const [filterGuardadoPorInput, setFilterGuardadoPorInput] = useState('');
+  const [filterEstadoSolicitudInput, setFilterEstadoSolicitudInput] = useState(''); // Added
 
   const [solicitudToViewInline, setSolicitudToViewInline] = useState<SolicitudRecord | null>(null);
   const [isDetailViewVisible, setIsDetailViewVisible] = useState(false);
@@ -384,34 +417,26 @@ export default function DatabasePage() {
 
   const displayedSolicitudes = useMemo(() => {
     if (!fetchedSolicitudes) return null;
-  
-    let accumulatedData = [...fetchedSolicitudes]; // Start with a copy of fetched data
-  
-    // Filter by Solicitud ID
-    if (filterSolicitudIdInput.trim()) {
-      const filtered = accumulatedData.filter(s =>
-        s.solicitudId.toLowerCase().includes(filterSolicitudIdInput.toLowerCase().trim())
-      );
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing to accumulatedData for this specific filter
-      }
+
+    let accumulatedData = [...fetchedSolicitudes];
+
+    if (filterEstadoSolicitudInput.trim()) {
+        const searchTerm = filterEstadoSolicitudInput.toLowerCase().trim();
+        const filtered = accumulatedData.filter(s => {
+            const badgeTexts: string[] = [];
+            if (s.documentosAdjuntos) badgeTexts.push("Docs Adjuntos");
+            if (s.soporte) badgeTexts.push("Soporte");
+            if (s.impuestosPendientesCliente) badgeTexts.push("Imp. Pendientes");
+            if (s.constanciasNoRetencion) badgeTexts.push("Const. No Ret.");
+            if (s.pagoServicios) badgeTexts.push("Pago Serv.");
+            if (badgeTexts.length === 0) badgeTexts.push("Sin Estados");
+            return badgeTexts.some(badgeText => badgeText.toLowerCase().includes(searchTerm));
+        });
+        if (filtered.length > 0) {
+            accumulatedData = filtered;
+        } // else: ignore filter if no results
     }
-  
-    // Filter by NE
-    if (filterNEInput.trim()) {
-      const filtered = accumulatedData.filter(s =>
-        s.examNe.toLowerCase().includes(filterNEInput.toLowerCase().trim())
-      );
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing
-      }
-    }
-  
-    // Filter by Estado de Pago
+
     if (filterEstadoPagoInput.trim()) {
       const filtered = accumulatedData.filter(s => {
         const statusText = s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente";
@@ -419,12 +444,18 @@ export default function DatabasePage() {
       });
       if (filtered.length > 0) {
         accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing
-      }
+      } // else: ignore filter
     }
-  
-    // Filter by Fecha de Solicitud
+    
+    if (filterSolicitudIdInput.trim()) {
+      const filtered = accumulatedData.filter(s =>
+        s.solicitudId.toLowerCase().includes(filterSolicitudIdInput.toLowerCase().trim())
+      );
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } // else: ignore filter
+    }
+
     if (filterFechaSolicitudInput.trim()) {
       const filtered = accumulatedData.filter(s => {
         const dateText = s.examDate && s.examDate instanceof Date
@@ -434,12 +465,18 @@ export default function DatabasePage() {
       });
       if (filtered.length > 0) {
         accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing
-      }
+      } // else: ignore filter
     }
-  
-    // Filter by Monto
+    
+    if (filterNEInput.trim()) {
+      const filtered = accumulatedData.filter(s =>
+        s.examNe.toLowerCase().includes(filterNEInput.toLowerCase().trim())
+      );
+      if (filtered.length > 0) {
+        accumulatedData = filtered;
+      } // else: ignore filter
+    }
+
     if (filterMontoInput.trim()) {
       const filtered = accumulatedData.filter(s => {
         const montoText = formatCurrencyFetched(s.monto ?? undefined, s.montoMoneda || undefined);
@@ -447,50 +484,38 @@ export default function DatabasePage() {
       });
       if (filtered.length > 0) {
         accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing
-      }
+      } // else: ignore filter
     }
-  
-    // Filter by Consignatario
+
     if (filterConsignatarioInput.trim()) {
       const filtered = accumulatedData.filter(s =>
         (s.consignatario || '').toLowerCase().includes(filterConsignatarioInput.toLowerCase().trim())
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing
-      }
+      } // else: ignore filter
     }
-  
-    // Filter by Declaración
+
     if (filterDeclaracionInput.trim()) {
       const filtered = accumulatedData.filter(s =>
         (s.declaracionNumero || '').toLowerCase().includes(filterDeclaracionInput.toLowerCase().trim())
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing
-      }
+      } // else: ignore filter
     }
-  
-    // Filter by Usuario (De)
-    if (filterUsuarioDeInput.trim()) {
+    
+    if (filterReferenciaInput.trim()) {
       const filtered = accumulatedData.filter(s =>
-        (s.examManager || '').toLowerCase().includes(filterUsuarioDeInput.toLowerCase().trim())
+        (s.examReference || '').toLowerCase().includes(filterReferenciaInput.toLowerCase().trim())
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing
-      }
+      } // else: ignore filter
     }
-  
-    // Filter by Guardado Por (with role logic)
+
     if (user?.role === 'autorevisor' && user?.email) {
-      // For autorevisor, this filter is mandatory and can empty the list
+      // This is a hard filter, not ignored if empty
       accumulatedData = accumulatedData.filter(s =>
         (s.savedBy || '').toLowerCase() === user.email!.toLowerCase()
       );
@@ -500,27 +525,25 @@ export default function DatabasePage() {
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
-      } else {
-        // If filter yields no results, do nothing
-      }
+      } // else: ignore filter
     }
-  
+
     return accumulatedData;
   }, [
     fetchedSolicitudes,
-    filterSolicitudIdInput,
-    filterNEInput,
+    filterEstadoSolicitudInput, // Added
     filterEstadoPagoInput,
+    filterSolicitudIdInput,
     filterFechaSolicitudInput,
+    filterNEInput,
     filterMontoInput,
     filterConsignatarioInput,
     filterDeclaracionInput,
-    filterUsuarioDeInput,
+    filterReferenciaInput,
     filterGuardadoPorInput,
     user?.role,
     user?.email
   ]);
-  
 
 
   const handleUpdatePaymentStatus = useCallback(async (solicitudId: string, status: string | null, message?: string) => {
@@ -546,7 +569,7 @@ export default function DatabasePage() {
 
       await updateDoc(docRef, {
         paymentStatus: newStatus,
-        paymentStatusLastUpdatedAt: serverTimestamp(), 
+        paymentStatusLastUpdatedAt: serverTimestamp(),
         paymentStatusLastUpdatedBy: user.email,
       });
       toast({ title: "Éxito", description: `Estado de pago actualizado para ${solicitudId}.` });
@@ -554,8 +577,8 @@ export default function DatabasePage() {
         prev?.map(s =>
           s.solicitudId === solicitudId
             ? { ...s,
-                paymentStatus: newStatus || undefined, 
-                paymentStatusLastUpdatedAt: new Date(), 
+                paymentStatus: newStatus || undefined,
+                paymentStatusLastUpdatedAt: new Date(),
                 paymentStatusLastUpdatedBy: user.email!
               }
             : s
@@ -600,8 +623,8 @@ export default function DatabasePage() {
   useEffect(() => {
     if (isClient && !authLoading) {
       const isAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
-      if (!isAuthorized && !isDetailViewVisible) { 
-        if (!fetchedSolicitudes) { 
+      if (!isAuthorized && !isDetailViewVisible) {
+        if (!fetchedSolicitudes) {
           router.push('/');
         }
       }
@@ -623,14 +646,15 @@ export default function DatabasePage() {
     setIsDetailViewVisible(false);
     setSolicitudToViewInline(null);
 
-    setFilterSolicitudIdInput('');
-    setFilterNEInput('');
+    setFilterEstadoSolicitudInput(''); // Reset new filter
     setFilterEstadoPagoInput('');
+    setFilterSolicitudIdInput('');
     setFilterFechaSolicitudInput('');
+    setFilterNEInput('');
     setFilterMontoInput('');
     setFilterConsignatarioInput('');
     setFilterDeclaracionInput('');
-    setFilterUsuarioDeInput('');
+    setFilterReferenciaInput('');
     if (user?.role !== 'autorevisor') {
       setFilterGuardadoPorInput('');
     }
@@ -693,23 +717,23 @@ export default function DatabasePage() {
       if (q) {
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
-          let data = querySnapshot.docs.map(docSnap => { 
+          let data = querySnapshot.docs.map(docSnap => {
             const docData = docSnap.data();
-            
+
             let examDateValue: Date | undefined;
             if (docData.examDate instanceof FirestoreTimestamp) {
                 examDateValue = docData.examDate.toDate();
-            } else if (docData.examDate instanceof Date) { 
+            } else if (docData.examDate instanceof Date) {
                 examDateValue = docData.examDate;
             }
 
             let savedAtValue: Date | undefined;
             if (docData.savedAt instanceof FirestoreTimestamp) {
                 savedAtValue = docData.savedAt.toDate();
-            } else if (docData.savedAt instanceof Date) { 
+            } else if (docData.savedAt instanceof Date) {
                 savedAtValue = docData.savedAt;
             }
-            
+
             const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
 
             return {
@@ -765,8 +789,8 @@ export default function DatabasePage() {
     } catch (err: any) {
       console.error("Error fetching documents from Firestore: ", err);
       let userFriendlyError = "Error al buscar las solicitudes. Intente de nuevo.";
-      if (err.code === 'permission-denied') { 
-        userFriendlyError = "No tiene permisos para acceder a esta información."; 
+      if (err.code === 'permission-denied') {
+        userFriendlyError = "No tiene permisos para acceder a esta información.";
       } else if (err.code === 'failed-precondition') {
         if (searchType === "manager") {
           if (datePickerStartDate || datePickerEndDate) {
@@ -789,15 +813,15 @@ export default function DatabasePage() {
     const dataToUse = displayedSolicitudes || [];
     if (dataToUse.length > 0) {
       const headers = [
-        "Estado de Pago", "ID Solicitud", "Fecha de Solicitud", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Usuario (De)", "Guardado Por",
-        "Cantidad en Letras", "Referencia Solicitud", "Destinatario Solicitud",
+        "Estado de Pago", "ID Solicitud", "Fecha de Solicitud", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por", // "Usuario (De)" removido, "Referencia" movida
+        "Cantidad en Letras", "Destinatario Solicitud",
         "Unidad Recaudadora", "Código 1", "Codigo MUR", "Banco", "Otro Banco", "Número de Cuenta", "Moneda de la Cuenta", "Otra Moneda Cuenta",
         "Elaborar Cheque A", "Elaborar Transferencia A",
         "Impuestos Pagados Cliente", "R/C (Imp. Pagados)", "T/B (Imp. Pagados)", "Cheque (Imp. Pagados)",
         "Impuestos Pendientes Cliente", "Soporte", "Documentos Adjuntos",
         "Constancias de No Retención", "Constancia 1%", "Constancia 2%",
         "Pago de Servicios", "Tipo de Servicio", "Otro Tipo de Servicio", "Factura Servicio", "Institución Servicio",
-        "Correo Notificación", "Observación",
+        "Correo Notificación", "Observación", "Usuario (De)", // Se mantiene "Usuario (De)" al final, como estaba originalmente
         "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)"
       ];
       const dataToExport = dataToUse.map(s => ({
@@ -809,11 +833,10 @@ export default function DatabasePage() {
         "Moneda Monto": s.montoMoneda,
         "Consignatario": s.consignatario || 'N/A',
         "Declaracion": s.declaracionNumero || 'N/A',
-        "Usuario (De)": s.examManager, 
-        "Guardado Por": s.savedBy || 'N/A', 
+        "Referencia": s.examReference || 'N/A', // Añadido aquí
+        "Guardado Por": s.savedBy || 'N/A',
 
         "Cantidad en Letras": s.cantidadEnLetras || 'N/A',
-        "Referencia Solicitud": s.examReference || 'N/A',
         "Destinatario Solicitud": s.examRecipient,
         "Unidad Recaudadora": s.unidadRecaudadora || 'N/A',
         "Código 1": s.codigo1 || 'N/A',
@@ -842,6 +865,7 @@ export default function DatabasePage() {
         "Institución Servicio": s.pagoServicios ? s.institucionServicio || 'N/A' : 'N/A',
         "Correo Notificación": s.correo || 'N/A',
         "Observación": s.observation || 'N/A',
+        "Usuario (De)": s.examManager, // Mantenido según aclaración
         "Fecha de Guardado": s.savedAt instanceof Date ? format(s.savedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "Actualizado Por (Pago)": s.paymentStatusLastUpdatedBy || 'N/A',
         "Fecha Actualización (Pago)": s.paymentStatusLastUpdatedAt && s.paymentStatusLastUpdatedAt instanceof Date ? format(s.paymentStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
@@ -858,13 +882,13 @@ export default function DatabasePage() {
       case "manager":
         return (
           <div className="flex-grow space-y-3">
-            <Input 
-              type="text" 
-              placeholder="Ingrese Usuario (Guardado Por)" 
-              value={searchTermText} 
-              onChange={(e) => setSearchTermText(e.target.value)} 
-              className="w-full" 
-              aria-label="Término de búsqueda de usuario" 
+            <Input
+              type="text"
+              placeholder="Ingrese Usuario (Guardado Por)"
+              value={searchTermText}
+              onChange={(e) => setSearchTermText(e.target.value)}
+              className="w-full"
+              aria-label="Término de búsqueda de usuario"
             />
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Filtrar por rango de fechas (Opcional):</Label>
@@ -924,8 +948,8 @@ export default function DatabasePage() {
       <AppShell>
         <div className="py-2 md:py-5">
           <div className="mb-4">
-             <Button 
-                onClick={handleBackToTable} 
+             <Button
+                onClick={handleBackToTable}
                 className="bg-green-600 text-white hover:bg-green-600 hover:text-white"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Búsqueda
@@ -967,13 +991,13 @@ export default function DatabasePage() {
 
             {isLoading && <div className="flex justify-center items-center py-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-3 text-muted-foreground">Cargando solicitudes...</p></div>}
             {error && <div className="mt-4 p-4 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-center">{error}</div>}
-            {displayedSolicitudes && !isLoading && 
-              <SearchResultsTable 
-                solicitudes={displayedSolicitudes} 
-                searchType={searchType} 
-                searchTerm={currentSearchTermForDisplay} 
-                currentUserRole={user?.role} 
-                onUpdatePaymentStatus={handleUpdatePaymentStatus} 
+            {displayedSolicitudes && !isLoading &&
+              <SearchResultsTable
+                solicitudes={displayedSolicitudes}
+                searchType={searchType}
+                searchTerm={currentSearchTermForDisplay}
+                currentUserRole={user?.role}
+                onUpdatePaymentStatus={handleUpdatePaymentStatus}
                 onOpenMessageDialog={openMessageDialog}
                 onViewDetails={handleViewDetailsInline}
                 filterSolicitudIdInput={filterSolicitudIdInput}
@@ -990,10 +1014,12 @@ export default function DatabasePage() {
                 setFilterConsignatarioInput={setFilterConsignatarioInput}
                 filterDeclaracionInput={filterDeclaracionInput}
                 setFilterDeclaracionInput={setFilterDeclaracionInput}
-                filterUsuarioDeInput={filterUsuarioDeInput}
-                setFilterUsuarioDeInput={setFilterUsuarioDeInput}
-                filterGuardadoPorInput={filterGuardadoPorInput} 
+                filterReferenciaInput={filterReferenciaInput}
+                setFilterReferenciaInput={setFilterReferenciaInput}
+                filterGuardadoPorInput={filterGuardadoPorInput}
                 setFilterGuardadoPorInput={setFilterGuardadoPorInput}
+                filterEstadoSolicitudInput={filterEstadoSolicitudInput} // Added
+                setFilterEstadoSolicitudInput={setFilterEstadoSolicitudInput} // Added
               />
             }
             {!fetchedSolicitudes && !isLoading && !error && !currentSearchTermForDisplay && <div className="mt-4 p-4 bg-blue-500/10 text-blue-700 border border-blue-500/30 rounded-md text-center">Seleccione un tipo de búsqueda e ingrese los criterios para ver resultados.</div>}
@@ -1029,3 +1055,4 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
+    
