@@ -7,6 +7,7 @@ import type { SolicitudRecord, InitialDataContext } from '@/types';
 import { Loader2, ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle as they are not used directly here for the main card
+import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -188,10 +189,17 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
                 data-ai-hint="company logo banner"
               />
           <div className="mb-3 p-4 border border-border rounded-md bg-secondary/5 card-print-styles">
-            <div className="grid grid-cols-[auto,1fr] gap-x-3 items-center">
-                <p className="text-xs font-medium text-muted-foreground flex items-center shrink-0">
-                    <Info className="h-3.5 w-3.5 mr-1.5 text-primary/70" />ID de Solicitud:&nbsp;</p>
-                <p className="text-sm text-foreground break-words">{solicitud.solicitudId}</p>
+            <div className="flex justify-between items-center">
+                <div className="flex items-center">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center shrink-0">
+                        <Info className="h-3.5 w-3.5 mr-1.5 text-primary/70" />ID de Solicitud:&nbsp;</p>
+                    <p className="text-sm text-foreground break-words">{solicitud.solicitudId}</p>
+                </div>
+                {solicitud.soporte && (
+                  <Badge className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-md border border-gray-300 print:border-gray-400 hover:bg-green-600 hover:text-white">
+                    PAGADA
+                  </Badge>
+                )}
             </div>
           </div>
           <div className="mb-3 p-4 border border-border rounded-md bg-secondary/30 card-print-styles">
@@ -318,4 +326,3 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     </div>
   );
 }
-
