@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -112,18 +113,26 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
               />
 
             <div className="mb-3 p-4 border border-border rounded-md bg-secondary/5 card-print-styles">
-                <div className="grid grid-cols-[auto,1fr] gap-x-3 items-center">
-                    <Label htmlFor={`solicitudIdDisplay-${solicitud.id}-inline`} className="flex items-center text-sm text-muted-foreground">
-                        <Info className="mr-2 h-4 w-4 text-primary/70" />
-                        ID de Solicitud
-                    </Label>
-                    <Input
-                        id={`solicitudIdDisplay-${solicitud.id}-inline`}
-                        value={solicitud.id}
-                        readOnly
-                        disabled
-                        className="bg-muted/50 cursor-not-allowed text-sm text-foreground"
-                    />
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                        <Label htmlFor={`solicitudIdDisplay-${solicitud.id}-inline`} className="flex items-center text-sm text-muted-foreground">
+                            <Info className="mr-2 h-4 w-4 text-primary/70" />
+                            ID de Solicitud:&nbsp;
+                        </Label>
+                        <Input
+                            id={`solicitudIdDisplay-${solicitud.id}-inline`}
+                            value={solicitud.id}
+                            readOnly
+                            disabled
+                            className="bg-muted/50 cursor-not-allowed text-sm text-foreground h-auto p-0 border-none ml-1"
+                            style={{ width: `${(solicitud.id.length * 0.55) + 1}em`, minWidth: '10em' }} 
+                        />
+                    </div>
+                    {solicitud.soporte && (
+                        <Badge className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-md border border-gray-300 print:border-gray-400 hover:bg-green-600 hover:text-white">
+                        PAGADA
+                        </Badge>
+                    )}
                 </div>
             </div>
 
@@ -250,3 +259,4 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
     </div>
   );
 }
+
