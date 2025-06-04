@@ -101,8 +101,9 @@ interface SearchResultsTableProps {
   setFilterReferenciaInput: (value: string) => void;
   filterGuardadoPorInput: string;
   setFilterGuardadoPorInput: (value: string) => void;
-  filterEstadoSolicitudInput: string; // Added
-  setFilterEstadoSolicitudInput: (value: string) => void; // Added
+  filterEstadoSolicitudInput: string; 
+  setFilterEstadoSolicitudInput: (value: string) => void;
+  duplicateWarning?: string | null;
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -131,8 +132,9 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   setFilterReferenciaInput,
   filterGuardadoPorInput,
   setFilterGuardadoPorInput,
-  filterEstadoSolicitudInput, // Added
-  setFilterEstadoSolicitudInput, // Added
+  filterEstadoSolicitudInput, 
+  setFilterEstadoSolicitudInput,
+  duplicateWarning,
 }) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -163,6 +165,11 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
       <CardHeader>
         <CardTitle className="text-xl md:text-2xl font-semibold text-foreground">{getTitle()}</CardTitle>
         <CardDescription className="text-muted-foreground">Se encontraron {solicitudes.length} solicitud(es) asociadas.</CardDescription>
+        {duplicateWarning && (
+          <div className="mt-2 p-3 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md" role="alert">
+            {duplicateWarning}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto table-container rounded-lg border">
@@ -385,6 +392,7 @@ export default function DatabasePage() {
   const [fetchedSolicitudes, setFetchedSolicitudes] = useState<SolicitudRecord[] | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [currentSearchTermForDisplay, setCurrentSearchTermForDisplay] = useState('');
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
   const [currentSolicitudIdForMessage, setCurrentSolicitudIdForMessage] = useState<string | null>(null);
@@ -399,7 +407,7 @@ export default function DatabasePage() {
   const [filterDeclaracionInput, setFilterDeclaracionInput] = useState('');
   const [filterReferenciaInput, setFilterReferenciaInput] = useState('');
   const [filterGuardadoPorInput, setFilterGuardadoPorInput] = useState('');
-  const [filterEstadoSolicitudInput, setFilterEstadoSolicitudInput] = useState(''); // Added
+  const [filterEstadoSolicitudInput, setFilterEstadoSolicitudInput] = useState('');
 
   const [solicitudToViewInline, setSolicitudToViewInline] = useState<SolicitudRecord | null>(null);
   const [isDetailViewVisible, setIsDetailViewVisible] = useState(false);
@@ -434,13 +442,16 @@ export default function DatabasePage() {
         });
         if (filtered.length > 0) {
             accumulatedData = filtered;
-        } // else: ignore filter if no results
+        } else {
+           // No changes to accumulatedData, filter is ignored
+        }
     }
 
     if (filterEstadoPagoInput.trim()) {
+      const searchTerm = filterEstadoPagoInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s => {
         const statusText = s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente";
-        return statusText.includes(filterEstadoPagoInput.toLowerCase().trim());
+        return statusText.includes(searchTerm);
       });
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -448,8 +459,9 @@ export default function DatabasePage() {
     }
     
     if (filterSolicitudIdInput.trim()) {
+      const searchTerm = filterSolicitudIdInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s =>
-        s.solicitudId.toLowerCase().includes(filterSolicitudIdInput.toLowerCase().trim())
+        s.solicitudId.toLowerCase().includes(searchTerm)
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -457,11 +469,12 @@ export default function DatabasePage() {
     }
 
     if (filterFechaSolicitudInput.trim()) {
+      const searchTerm = filterFechaSolicitudInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s => {
         const dateText = s.examDate && s.examDate instanceof Date
           ? format(s.examDate, "PPP", { locale: es })
           : 'N/A';
-        return dateText.toLowerCase().includes(filterFechaSolicitudInput.toLowerCase().trim());
+        return dateText.toLowerCase().includes(searchTerm);
       });
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -469,8 +482,9 @@ export default function DatabasePage() {
     }
     
     if (filterNEInput.trim()) {
+      const searchTerm = filterNEInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s =>
-        s.examNe.toLowerCase().includes(filterNEInput.toLowerCase().trim())
+        s.examNe.toLowerCase().includes(searchTerm)
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -478,9 +492,10 @@ export default function DatabasePage() {
     }
 
     if (filterMontoInput.trim()) {
+      const searchTerm = filterMontoInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s => {
         const montoText = formatCurrencyFetched(s.monto ?? undefined, s.montoMoneda || undefined);
-        return montoText.toLowerCase().includes(filterMontoInput.toLowerCase().trim());
+        return montoText.toLowerCase().includes(searchTerm);
       });
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -488,8 +503,9 @@ export default function DatabasePage() {
     }
 
     if (filterConsignatarioInput.trim()) {
+      const searchTerm = filterConsignatarioInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s =>
-        (s.consignatario || '').toLowerCase().includes(filterConsignatarioInput.toLowerCase().trim())
+        (s.consignatario || '').toLowerCase().includes(searchTerm)
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -497,8 +513,9 @@ export default function DatabasePage() {
     }
 
     if (filterDeclaracionInput.trim()) {
+      const searchTerm = filterDeclaracionInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s =>
-        (s.declaracionNumero || '').toLowerCase().includes(filterDeclaracionInput.toLowerCase().trim())
+        (s.declaracionNumero || '').toLowerCase().includes(searchTerm)
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -506,8 +523,9 @@ export default function DatabasePage() {
     }
     
     if (filterReferenciaInput.trim()) {
+      const searchTerm = filterReferenciaInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s =>
-        (s.examReference || '').toLowerCase().includes(filterReferenciaInput.toLowerCase().trim())
+        (s.examReference || '').toLowerCase().includes(searchTerm)
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -515,13 +533,13 @@ export default function DatabasePage() {
     }
 
     if (user?.role === 'autorevisor' && user?.email) {
-      // This is a hard filter, not ignored if empty
       accumulatedData = accumulatedData.filter(s =>
         (s.savedBy || '').toLowerCase() === user.email!.toLowerCase()
       );
     } else if (filterGuardadoPorInput.trim()) {
+      const searchTerm = filterGuardadoPorInput.toLowerCase().trim();
       const filtered = accumulatedData.filter(s =>
-        (s.savedBy || '').toLowerCase().includes(filterGuardadoPorInput.toLowerCase().trim())
+        (s.savedBy || '').toLowerCase().includes(searchTerm)
       );
       if (filtered.length > 0) {
         accumulatedData = filtered;
@@ -531,7 +549,7 @@ export default function DatabasePage() {
     return accumulatedData;
   }, [
     fetchedSolicitudes,
-    filterEstadoSolicitudInput, // Added
+    filterEstadoSolicitudInput,
     filterEstadoPagoInput,
     filterSolicitudIdInput,
     filterFechaSolicitudInput,
@@ -642,11 +660,12 @@ export default function DatabasePage() {
     setIsLoading(true);
     setError(null);
     setFetchedSolicitudes(null);
+    setDuplicateWarning(null);
     setCurrentSearchTermForDisplay('');
     setIsDetailViewVisible(false);
     setSolicitudToViewInline(null);
 
-    setFilterEstadoSolicitudInput(''); // Reset new filter
+    setFilterEstadoSolicitudInput(''); 
     setFilterEstadoPagoInput('');
     setFilterSolicitudIdInput('');
     setFilterFechaSolicitudInput('');
@@ -784,6 +803,35 @@ export default function DatabasePage() {
             } as SolicitudRecord;
           });
           setFetchedSolicitudes(data);
+
+          // Duplicate detection logic
+          if (data && data.length > 1) {
+            const potentialDuplicatesMap = new Map<string, string[]>();
+            data.forEach(solicitud => {
+              if (solicitud.examNe && solicitud.examNe.trim() !== '' &&
+                  solicitud.monto !== null && // Allows 0 as a valid amount
+                  solicitud.montoMoneda && solicitud.montoMoneda.trim() !== '') {
+                const key = `${solicitud.examNe.trim()}-${solicitud.monto}-${solicitud.montoMoneda.trim()}`;
+                if (!potentialDuplicatesMap.has(key)) {
+                  potentialDuplicatesMap.set(key, []);
+                }
+                potentialDuplicatesMap.get(key)!.push(solicitud.solicitudId);
+              }
+            });
+
+            const duplicateGroups: string[][] = [];
+            potentialDuplicatesMap.forEach(ids => {
+              if (ids.length > 1) {
+                duplicateGroups.push(ids);
+              }
+            });
+
+            if (duplicateGroups.length > 0) {
+              const duplicateIdsText = duplicateGroups.map(group => `(${group.join(', ')})`).join('; ');
+              setDuplicateWarning(`Posible acción duplicada. Revise los siguientes Documentos ID con NE, Monto y Moneda idénticos: ${duplicateIdsText}.`);
+            }
+          }
+
         } else { setError("No se encontraron solicitudes para los criterios ingresados."); }
       }
     } catch (err: any) {
@@ -799,7 +847,7 @@ export default function DatabasePage() {
              userFriendlyError = "Error de consulta: Para buscar 'Por Usuario (Guardado Por)', necesita un índice en Firestore en el campo 'savedBy' (ascendente) y 'examDate' (descendente). Puede haber un enlace en la consola del navegador para ayudarle a crearlos.";
           }
         } else if (searchType === "ne") {
-            userFriendlyError = "Error de consulta: Para buscar 'Por NE', necesita un índice en Firestore en el campo 'examNe' (ascendente) y 'examDate' (descendente). Puede haber un enlace en la consola del navegador para ayudarle a crearlo.";
+            userFriendlyError = "Error de consulta: Para buscar 'Por NE', necesita un índice en Firestore en el campo 'examNe' (ascendente) y 'examDate' (descendente). Puede haber un enlace en la consola del navegador para ayudarle a crearlos.";
         }
          else {
             userFriendlyError = "Error de consulta: asegúrese de tener los índices necesarios creados en Firestore para los campos y orden seleccionados. La creación de índices puede tardar unos minutos. Por favor, cree este índice en la consola de Firestore (puede haber un enlace en la consola del navegador).";
@@ -813,7 +861,7 @@ export default function DatabasePage() {
     const dataToUse = displayedSolicitudes || [];
     if (dataToUse.length > 0) {
       const headers = [
-        "Estado de Pago", "ID Solicitud", "Fecha de Solicitud", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por", // "Usuario (De)" removido, "Referencia" movida
+        "Estado de Pago", "ID Solicitud", "Fecha de Solicitud", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
         "Cantidad en Letras", "Destinatario Solicitud",
         "Unidad Recaudadora", "Código 1", "Codigo MUR", "Banco", "Otro Banco", "Número de Cuenta", "Moneda de la Cuenta", "Otra Moneda Cuenta",
         "Elaborar Cheque A", "Elaborar Transferencia A",
@@ -821,7 +869,7 @@ export default function DatabasePage() {
         "Impuestos Pendientes Cliente", "Soporte", "Documentos Adjuntos",
         "Constancias de No Retención", "Constancia 1%", "Constancia 2%",
         "Pago de Servicios", "Tipo de Servicio", "Otro Tipo de Servicio", "Factura Servicio", "Institución Servicio",
-        "Correo Notificación", "Observación", "Usuario (De)", // Se mantiene "Usuario (De)" al final, como estaba originalmente
+        "Correo Notificación", "Observación", "Usuario (De)", 
         "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)"
       ];
       const dataToExport = dataToUse.map(s => ({
@@ -833,7 +881,7 @@ export default function DatabasePage() {
         "Moneda Monto": s.montoMoneda,
         "Consignatario": s.consignatario || 'N/A',
         "Declaracion": s.declaracionNumero || 'N/A',
-        "Referencia": s.examReference || 'N/A', // Añadido aquí
+        "Referencia": s.examReference || 'N/A',
         "Guardado Por": s.savedBy || 'N/A',
 
         "Cantidad en Letras": s.cantidadEnLetras || 'N/A',
@@ -865,7 +913,7 @@ export default function DatabasePage() {
         "Institución Servicio": s.pagoServicios ? s.institucionServicio || 'N/A' : 'N/A',
         "Correo Notificación": s.correo || 'N/A',
         "Observación": s.observation || 'N/A',
-        "Usuario (De)": s.examManager, // Mantenido según aclaración
+        "Usuario (De)": s.examManager, 
         "Fecha de Guardado": s.savedAt instanceof Date ? format(s.savedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "Actualizado Por (Pago)": s.paymentStatusLastUpdatedBy || 'N/A',
         "Fecha Actualización (Pago)": s.paymentStatusLastUpdatedAt && s.paymentStatusLastUpdatedAt instanceof Date ? format(s.paymentStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
@@ -972,7 +1020,7 @@ export default function DatabasePage() {
           <CardContent>
             <form onSubmit={handleSearch} className="space-y-4 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Select value={searchType} onValueChange={(value) => { setSearchType(value as SearchType); setSearchTermText(''); setSelectedDate(undefined); setDatePickerStartDate(undefined); setDatePickerEndDate(undefined); setFetchedSolicitudes(null); setError(null); setCurrentSearchTermForDisplay(''); }}>
+              <Select value={searchType} onValueChange={(value) => { setSearchType(value as SearchType); setSearchTermText(''); setSelectedDate(undefined); setDatePickerStartDate(undefined); setDatePickerEndDate(undefined); setFetchedSolicitudes(null); setError(null); setDuplicateWarning(null); setCurrentSearchTermForDisplay(''); }}>
                   <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue placeholder="Tipo de búsqueda" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
@@ -1018,8 +1066,9 @@ export default function DatabasePage() {
                 setFilterReferenciaInput={setFilterReferenciaInput}
                 filterGuardadoPorInput={filterGuardadoPorInput}
                 setFilterGuardadoPorInput={setFilterGuardadoPorInput}
-                filterEstadoSolicitudInput={filterEstadoSolicitudInput} // Added
-                setFilterEstadoSolicitudInput={setFilterEstadoSolicitudInput} // Added
+                filterEstadoSolicitudInput={filterEstadoSolicitudInput} 
+                setFilterEstadoSolicitudInput={setFilterEstadoSolicitudInput}
+                duplicateWarning={duplicateWarning}
               />
             }
             {!fetchedSolicitudes && !isLoading && !error && !currentSearchTermForDisplay && <div className="mt-4 p-4 bg-blue-500/10 text-blue-700 border border-blue-500/30 rounded-md text-center">Seleccione un tipo de búsqueda e ingrese los criterios para ver resultados.</div>}
@@ -1055,4 +1104,3 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
-    
