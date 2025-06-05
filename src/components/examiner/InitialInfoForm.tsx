@@ -189,7 +189,7 @@ function onSubmit(data: InitialDataFormData) {
                 name="reference"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Referencia (Contenedor, Doc. Embarque, Factura, Servicio...)</FormLabel>
+                    <FormLabel>Referencia (Contenedor, D/Embarque, #FA, Servicio...)</FormLabel>
                     <FormControl>
                       <Input placeholder="Ej: MSKU1234567" {...field} value={field.value ?? ''} />
                     </FormControl>
