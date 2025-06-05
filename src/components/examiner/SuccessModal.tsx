@@ -105,11 +105,11 @@ export function SuccessModal() {
           savedAt: FirestoreTimestamp.fromDate(new Date()), 
           savedBy: user.email,
           
-          paymentStatus: undefined, // Not set here
-          paymentStatusLastUpdatedBy: undefined, // Not set here
+          paymentStatus: null, 
+          paymentStatusLastUpdatedBy: null,
 
-          recepcionDCStatus: false, // Initialize to false
-          recepcionDCLastUpdatedBy: undefined, // Not set here
+          recepcionDCStatus: false, 
+          recepcionDCLastUpdatedBy: null,
         };
 
         const solicitudDocRef = doc(db, "SolicitudCheques", solicitud.id);
