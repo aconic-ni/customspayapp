@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, or } from 'firebase/firestore';
 import type { SolicitudRecord } from '@/types';
@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +82,7 @@ interface SearchResultsTableProps {
   searchTerm?: string;
   currentUserRole?: string;
   onUpdatePaymentStatus: (solicitudId: string, status: string | null, message?: string) => Promise<void>;
+  onUpdateRecepcionDCStatus: (solicitudId: string, status: boolean) => Promise<void>;
   onOpenMessageDialog: (solicitudId: string) => void;
   onViewDetails: (solicitud: SolicitudRecord) => void;
   filterSolicitudIdInput: string;
@@ -101,7 +103,7 @@ interface SearchResultsTableProps {
   setFilterReferenciaInput: (value: string) => void;
   filterGuardadoPorInput: string;
   setFilterGuardadoPorInput: (value: string) => void;
-  filterEstadoSolicitudInput: string; 
+  filterEstadoSolicitudInput: string;
   setFilterEstadoSolicitudInput: (value: string) => void;
   duplicateWarning?: string | null;
 }
@@ -112,6 +114,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   searchTerm,
   currentUserRole,
   onUpdatePaymentStatus,
+  onUpdateRecepcionDCStatus,
   onOpenMessageDialog,
   onViewDetails,
   filterSolicitudIdInput,
@@ -132,12 +135,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   setFilterReferenciaInput,
   filterGuardadoPorInput,
   setFilterGuardadoPorInput,
-  filterEstadoSolicitudInput, 
+  filterEstadoSolicitudInput,
   setFilterEstadoSolicitudInput,
   duplicateWarning,
 }) => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useAuth(); 
 
   if (!solicitudes || solicitudes.length === 0) {
     let message = "No se encontraron solicitudes para los criterios ingresados.";
@@ -195,6 +198,9 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterEstadoPagoInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                  Recepción DC
                 </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   ID Solicitud
@@ -256,7 +262,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Referencia
                   <Input
                     type="text"
@@ -296,12 +302,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                             if (checked) {
                               onUpdatePaymentStatus(solicitud.solicitudId, 'Pagado');
                             } else {
-                              if (solicitud.paymentStatus === 'Pagado') {
+                              if (solicitud.paymentStatus === 'Pagado' || solicitud.paymentStatus?.startsWith('Error:')) {
                                  onUpdatePaymentStatus(solicitud.solicitudId, null);
                               }
                             }
                           }}
-                          aria-label="Marcar como pagado"
+                          aria-label="Marcar como pagado / pendiente"
                         />
                         <Button variant="ghost" size="icon" onClick={() => onOpenMessageDialog(solicitud.solicitudId)} aria-label="Añadir mensaje de error">
                           <MessageSquare className="h-5 w-5 text-muted-foreground hover:text-primary" />
@@ -311,6 +317,9 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                         )}
                         {solicitud.paymentStatus && solicitud.paymentStatus.startsWith('Error:') && (
                             <Badge variant="destructive">{solicitud.paymentStatus}</Badge>
+                        )}
+                        {(!solicitud.paymentStatus || (solicitud.paymentStatus && !solicitud.paymentStatus.startsWith('Error:') && solicitud.paymentStatus !== 'Pagado')) && (
+                             <Badge variant="outline">Pendiente</Badge>
                         )}
                       </div>
                     ) : (
@@ -335,7 +344,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent className="text-xs">
-                                <p>Última actualización:</p>
+                                <p>Última actualización (Pago):</p>
                                 {solicitud.paymentStatusLastUpdatedBy && <p>Por: {solicitud.paymentStatusLastUpdatedBy}</p>}
                                 {solicitud.paymentStatusLastUpdatedAt && solicitud.paymentStatusLastUpdatedAt instanceof Date && <p>Fecha: {format(solicitud.paymentStatusLastUpdatedAt, "Pp", { locale: es })}</p>}
                               </TooltipContent>
@@ -344,6 +353,52 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                         )}
                       </div>
                     )}
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
+                     {currentUserRole === 'calificador' ? (
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                checked={!!solicitud.recepcionDCStatus}
+                                onCheckedChange={(checked) => {
+                                    onUpdateRecepcionDCStatus(solicitud.solicitudId, !!checked);
+                                }}
+                                aria-label="Marcar como recibido / pendiente"
+                            />
+                            {solicitud.recepcionDCStatus ? (
+                                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center">
+                                    <CheckSquareIcon className="h-3.5 w-3.5 mr-1"/> Recibido
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline">Pendiente</Badge>
+                            )}
+                        </div>
+                     ) : (
+                        <div className="flex items-center space-x-1">
+                        {solicitud.recepcionDCStatus ? (
+                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center">
+                                <CheckSquareIcon className="h-3.5 w-3.5 mr-1"/> Recibido
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline">Pendiente</Badge>
+                        )}
+                        {(solicitud.recepcionDCLastUpdatedAt || solicitud.recepcionDCLastUpdatedBy) && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                  <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">
+                                <p>Última actualización (Recepción):</p>
+                                {solicitud.recepcionDCLastUpdatedBy && <p>Por: {solicitud.recepcionDCLastUpdatedBy}</p>}
+                                {solicitud.recepcionDCLastUpdatedAt && solicitud.recepcionDCLastUpdatedAt instanceof Date && <p>Fecha: {format(solicitud.recepcionDCLastUpdatedAt, "Pp", { locale: es })}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        </div>
+                     )}
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{solicitud.solicitudId}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
@@ -425,127 +480,66 @@ export default function DatabasePage() {
 
   const displayedSolicitudes = useMemo(() => {
     if (!fetchedSolicitudes) return null;
-
     let accumulatedData = [...fetchedSolicitudes];
 
-    if (filterEstadoSolicitudInput.trim()) {
-        const searchTerm = filterEstadoSolicitudInput.toLowerCase().trim();
-        const filtered = accumulatedData.filter(s => {
-            const badgeTexts: string[] = [];
-            if (s.documentosAdjuntos) badgeTexts.push("Docs Adjuntos");
-            if (s.soporte) badgeTexts.push("Soporte");
-            if (s.impuestosPendientesCliente) badgeTexts.push("Imp. Pendientes");
-            if (s.constanciasNoRetencion) badgeTexts.push("Const. No Ret.");
-            if (s.pagoServicios) badgeTexts.push("Pago Serv.");
-            if (badgeTexts.length === 0) badgeTexts.push("Sin Estados");
-            return badgeTexts.some(badgeText => badgeText.toLowerCase().includes(searchTerm));
-        });
-        if (filtered.length > 0) {
-            accumulatedData = filtered;
-        } else {
-           // No changes to accumulatedData, filter is ignored
-        }
-    }
+    const applyFilter = (
+        data: SolicitudRecord[],
+        filterValue: string,
+        filterFn: (item: SolicitudRecord, searchTerm: string) => boolean
+    ): SolicitudRecord[] => {
+        if (!filterValue.trim()) return data;
+        const searchTerm = filterValue.toLowerCase().trim();
+        const filtered = data.filter(item => filterFn(item, searchTerm));
+        return filtered.length > 0 || data.length === 0 ? filtered : data; 
+    };
 
-    if (filterEstadoPagoInput.trim()) {
-      const searchTerm = filterEstadoPagoInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s => {
-        const statusText = s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente";
-        return statusText.includes(searchTerm);
-      });
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
-    }
-    
-    if (filterSolicitudIdInput.trim()) {
-      const searchTerm = filterSolicitudIdInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s =>
-        s.solicitudId.toLowerCase().includes(searchTerm)
-      );
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
-    }
+    accumulatedData = applyFilter(accumulatedData, filterEstadoSolicitudInput, (s, term) => {
+        const badgeTexts: string[] = [];
+        if (s.documentosAdjuntos) badgeTexts.push("Docs Adjuntos");
+        if (s.soporte) badgeTexts.push("Soporte");
+        if (s.impuestosPendientesCliente) badgeTexts.push("Imp. Pendientes");
+        if (s.constanciasNoRetencion) badgeTexts.push("Const. No Ret.");
+        if (s.pagoServicios) badgeTexts.push("Pago Serv.");
+        if (badgeTexts.length === 0) badgeTexts.push("Sin Estados");
+        return badgeTexts.some(badgeText => badgeText.toLowerCase().includes(term));
+    });
 
-    if (filterFechaSolicitudInput.trim()) {
-      const searchTerm = filterFechaSolicitudInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s => {
-        const dateText = s.examDate && s.examDate instanceof Date
-          ? format(s.examDate, "PPP", { locale: es })
-          : 'N/A';
-        return dateText.toLowerCase().includes(searchTerm);
-      });
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
-    }
-    
-    if (filterNEInput.trim()) {
-      const searchTerm = filterNEInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s =>
-        s.examNe.toLowerCase().includes(searchTerm)
-      );
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
-    }
-
-    if (filterMontoInput.trim()) {
-      const searchTerm = filterMontoInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s => {
+    accumulatedData = applyFilter(accumulatedData, filterEstadoPagoInput, (s, term) =>
+        (s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente").includes(term)
+    );
+    accumulatedData = applyFilter(accumulatedData, filterSolicitudIdInput, (s, term) =>
+        s.solicitudId.toLowerCase().includes(term)
+    );
+    accumulatedData = applyFilter(accumulatedData, filterFechaSolicitudInput, (s, term) => {
+        const dateText = s.examDate && s.examDate instanceof Date ? format(s.examDate, "PPP", { locale: es }) : 'N/A';
+        return dateText.toLowerCase().includes(term);
+    });
+    accumulatedData = applyFilter(accumulatedData, filterNEInput, (s, term) =>
+        s.examNe.toLowerCase().includes(term)
+    );
+    accumulatedData = applyFilter(accumulatedData, filterMontoInput, (s, term) => {
         const montoText = formatCurrencyFetched(s.monto ?? undefined, s.montoMoneda || undefined);
-        return montoText.toLowerCase().includes(searchTerm);
-      });
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
-    }
-
-    if (filterConsignatarioInput.trim()) {
-      const searchTerm = filterConsignatarioInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s =>
-        (s.consignatario || '').toLowerCase().includes(searchTerm)
-      );
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
-    }
-
-    if (filterDeclaracionInput.trim()) {
-      const searchTerm = filterDeclaracionInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s =>
-        (s.declaracionNumero || '').toLowerCase().includes(searchTerm)
-      );
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
-    }
-    
-    if (filterReferenciaInput.trim()) {
-      const searchTerm = filterReferenciaInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s =>
-        (s.examReference || '').toLowerCase().includes(searchTerm)
-      );
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
-    }
+        return montoText.toLowerCase().includes(term);
+    });
+    accumulatedData = applyFilter(accumulatedData, filterConsignatarioInput, (s, term) =>
+        (s.consignatario || '').toLowerCase().includes(term)
+    );
+    accumulatedData = applyFilter(accumulatedData, filterDeclaracionInput, (s, term) =>
+        (s.declaracionNumero || '').toLowerCase().includes(term)
+    );
+    accumulatedData = applyFilter(accumulatedData, filterReferenciaInput, (s, term) =>
+        (s.examReference || '').toLowerCase().includes(term)
+    );
 
     if (user?.role === 'autorevisor' && user?.email) {
       accumulatedData = accumulatedData.filter(s =>
         (s.savedBy || '').toLowerCase() === user.email!.toLowerCase()
       );
-    } else if (filterGuardadoPorInput.trim()) {
-      const searchTerm = filterGuardadoPorInput.toLowerCase().trim();
-      const filtered = accumulatedData.filter(s =>
-        (s.savedBy || '').toLowerCase().includes(searchTerm)
+    } else {
+      accumulatedData = applyFilter(accumulatedData, filterGuardadoPorInput, (s, term) =>
+        (s.savedBy || '').toLowerCase().includes(term)
       );
-      if (filtered.length > 0) {
-        accumulatedData = filtered;
-      } // else: ignore filter
     }
-
     return accumulatedData;
   }, [
     fetchedSolicitudes,
@@ -574,16 +568,12 @@ export default function DatabasePage() {
       let newStatus = status;
       if (message && message.trim() !== '') {
         newStatus = `Error: ${message.trim()}`;
-      } else if (message === '' && status && status.startsWith('Error:')) {
-      } else if (message === '' && !status) {
+      } else if (messageText.trim() === '' && !status) { 
          const currentSolicitud = fetchedSolicitudes?.find(s => s.solicitudId === solicitudId);
          if(currentSolicitud?.paymentStatus?.startsWith('Error:')) {
             newStatus = null;
-         } else if (status === null && currentSolicitud?.paymentStatus === 'Pagado') {
-            newStatus = null;
          }
       }
-
 
       await updateDoc(docRef, {
         paymentStatus: newStatus,
@@ -595,8 +585,8 @@ export default function DatabasePage() {
         prev?.map(s =>
           s.solicitudId === solicitudId
             ? { ...s,
-                paymentStatus: newStatus || undefined,
-                paymentStatusLastUpdatedAt: new Date(),
+                paymentStatus: newStatus || undefined, 
+                paymentStatusLastUpdatedAt: new Date(), 
                 paymentStatusLastUpdatedBy: user.email!
               }
             : s
@@ -606,7 +596,39 @@ export default function DatabasePage() {
       console.error("Error updating payment status: ", err);
       toast({ title: "Error", description: "No se pudo actualizar el estado de pago.", variant: "destructive" });
     }
-  }, [user, toast, fetchedSolicitudes]);
+  }, [user, toast, fetchedSolicitudes, messageText]);
+
+
+  const handleUpdateRecepcionDCStatus = useCallback(async (solicitudId: string, status: boolean) => {
+    if (!user || !user.email) {
+      toast({ title: "Error", description: "Usuario no autenticado.", variant: "destructive" });
+      return;
+    }
+    const docRef = doc(db, "SolicitudCheques", solicitudId);
+    try {
+      await updateDoc(docRef, {
+        recepcionDCStatus: status,
+        recepcionDCLastUpdatedAt: serverTimestamp(),
+        recepcionDCLastUpdatedBy: user.email,
+      });
+      toast({ title: "Éxito", description: `Estado de recepción DC actualizado para ${solicitudId}.` });
+      setFetchedSolicitudes(prev =>
+        prev?.map(s =>
+          s.solicitudId === solicitudId
+            ? { ...s,
+                recepcionDCStatus: status,
+                recepcionDCLastUpdatedAt: new Date(),
+                recepcionDCLastUpdatedBy: user.email!
+              }
+            : s
+        ) || null
+      );
+    } catch (err) {
+      console.error("Error updating recepcion DC status: ", err);
+      toast({ title: "Error", description: "No se pudo actualizar el estado de recepción DC.", variant: "destructive" });
+    }
+  }, [user, toast]);
+
 
   const openMessageDialog = (solicitudId: string) => {
     setCurrentSolicitudIdForMessage(solicitudId);
@@ -622,9 +644,11 @@ export default function DatabasePage() {
   const handleSaveMessage = async () => {
     if (currentSolicitudIdForMessage) {
       const currentSolicitud = fetchedSolicitudes?.find(s => s.solicitudId === currentSolicitudIdForMessage);
-      if (messageText.trim() === '' && currentSolicitud?.paymentStatus?.startsWith('Error:')) {
-        await handleUpdatePaymentStatus(currentSolicitudIdForMessage, null);
-      } else if (messageText.trim() !== '') {
+      if (messageText.trim() === '') {
+        if (currentSolicitud?.paymentStatus?.startsWith('Error:') || currentSolicitud?.paymentStatus === 'Pagado') {
+          await handleUpdatePaymentStatus(currentSolicitudIdForMessage, null);
+        }
+      } else {
         await handleUpdatePaymentStatus(currentSolicitudIdForMessage, `Error: ${messageText.trim()}`, messageText.trim());
       }
     }
@@ -641,8 +665,8 @@ export default function DatabasePage() {
   useEffect(() => {
     if (isClient && !authLoading) {
       const isAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
-      if (!isAuthorized && !isDetailViewVisible) {
-        if (!fetchedSolicitudes) {
+      if (!isAuthorized && !isDetailViewVisible) { 
+        if (!fetchedSolicitudes) { 
           router.push('/');
         }
       }
@@ -665,7 +689,7 @@ export default function DatabasePage() {
     setIsDetailViewVisible(false);
     setSolicitudToViewInline(null);
 
-    setFilterEstadoSolicitudInput(''); 
+    setFilterEstadoSolicitudInput('');
     setFilterEstadoPagoInput('');
     setFilterSolicitudIdInput('');
     setFilterFechaSolicitudInput('');
@@ -678,12 +702,58 @@ export default function DatabasePage() {
       setFilterGuardadoPorInput('');
     }
 
+
     const solicitudsCollectionRef = collection(db, "SolicitudCheques");
     let q;
     let termForDisplay = searchTermText.trim();
 
     try {
       switch (searchType) {
+        case "ne":
+          if (!termForDisplay) { setError("Por favor, ingrese un NE."); setIsLoading(false); return; }
+          q = query(solicitudsCollectionRef, where("examNe", "==", termForDisplay), orderBy("examDate", "desc"));
+          break;
+        case "solicitudId":
+          if (!termForDisplay) { setError("Por favor, ingrese un ID de Solicitud."); setIsLoading(false); return; }
+          const docRef = doc(db, "SolicitudCheques", termForDisplay);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const docData = docSnap.data();
+            const examDateValue = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : undefined);
+            const savedAtValue = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : undefined);
+            const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
+            const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
+            setFetchedSolicitudes([{
+              ...docData,
+              solicitudId: docSnap.id,
+              examDate: examDateValue,
+              savedAt: savedAtValue,
+              paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
+              recepcionDCStatus: docData.recepcionDCStatus ?? false,
+              recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
+              recepcionDCLastUpdatedBy: docData.recepcionDCLastUpdatedBy || undefined,
+            } as SolicitudRecord]);
+          } else {
+            setError(`No se encontró la solicitud con ID: ${termForDisplay}`);
+          }
+          setIsLoading(false); return; 
+        case "manager":
+          if (!termForDisplay) { setError("Por favor, ingrese un Usuario (Guardado Por)."); setIsLoading(false); return; }
+          if (datePickerStartDate && datePickerEndDate) {
+            if (datePickerEndDate < datePickerStartDate) { setError("La fecha de fin no puede ser anterior a la fecha de inicio."); setIsLoading(false); return; }
+            const rangeStart = startOfDay(datePickerStartDate);
+            const rangeEnd = endOfDay(datePickerEndDate);
+            q = query(solicitudsCollectionRef,
+              where("savedBy", "==", termForDisplay),
+              where("examDate", ">=", FirestoreTimestamp.fromDate(rangeStart)),
+              where("examDate", "<=", FirestoreTimestamp.fromDate(rangeEnd)),
+              orderBy("examDate", "desc")
+            );
+            termForDisplay = `${termForDisplay} (${format(datePickerStartDate, "P", { locale: es })} - ${format(datePickerEndDate, "P", { locale: es })})`;
+          } else {
+            q = query(solicitudsCollectionRef, where("savedBy", "==", termForDisplay), orderBy("examDate", "desc"));
+          }
+          break;
         case "dateToday":
           const todayStart = startOfDay(new Date());
           const todayEnd = endOfDay(new Date());
@@ -738,30 +808,20 @@ export default function DatabasePage() {
         if (!querySnapshot.empty) {
           let data = querySnapshot.docs.map(docSnap => {
             const docData = docSnap.data();
-
-            let examDateValue: Date | undefined;
-            if (docData.examDate instanceof FirestoreTimestamp) {
-                examDateValue = docData.examDate.toDate();
-            } else if (docData.examDate instanceof Date) {
-                examDateValue = docData.examDate;
-            }
-
-            let savedAtValue: Date | undefined;
-            if (docData.savedAt instanceof FirestoreTimestamp) {
-                savedAtValue = docData.savedAt.toDate();
-            } else if (docData.savedAt instanceof Date) {
-                savedAtValue = docData.savedAt;
-            }
-
+            const examDateValue = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : undefined);
+            const savedAtValue = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : undefined);
             const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
-
+            const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
             return {
               ...docData,
               solicitudId: docSnap.id,
               examDate: examDateValue,
               savedAt: savedAtValue,
               paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
-              examNe: docData.examNe || '',
+              recepcionDCStatus: docData.recepcionDCStatus ?? false,
+              recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
+              recepcionDCLastUpdatedBy: docData.recepcionDCLastUpdatedBy || undefined,
+              examNe: docData.examNe || '', 
               examReference: docData.examReference || null,
               examManager: docData.examManager || '',
               examRecipient: docData.examRecipient || '',
@@ -804,12 +864,11 @@ export default function DatabasePage() {
           });
           setFetchedSolicitudes(data);
 
-          // Duplicate detection logic
           if (data && data.length > 1) {
             const potentialDuplicatesMap = new Map<string, string[]>();
             data.forEach(solicitud => {
               if (solicitud.examNe && solicitud.examNe.trim() !== '' &&
-                  solicitud.monto !== null && // Allows 0 as a valid amount
+                  solicitud.monto !== null && 
                   solicitud.montoMoneda && solicitud.montoMoneda.trim() !== '') {
                 const key = `${solicitud.examNe.trim()}-${solicitud.monto}-${solicitud.montoMoneda.trim()}`;
                 if (!potentialDuplicatesMap.has(key)) {
@@ -861,7 +920,7 @@ export default function DatabasePage() {
     const dataToUse = displayedSolicitudes || [];
     if (dataToUse.length > 0) {
       const headers = [
-        "Estado de Pago", "ID Solicitud", "Fecha de Solicitud", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
+        "Estado de Pago", "Recepción DC", "Recepción DC Por", "Recepción DC Fecha", "ID Solicitud", "Fecha de Solicitud", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
         "Cantidad en Letras", "Destinatario Solicitud",
         "Unidad Recaudadora", "Código 1", "Codigo MUR", "Banco", "Otro Banco", "Número de Cuenta", "Moneda de la Cuenta", "Otra Moneda Cuenta",
         "Elaborar Cheque A", "Elaborar Transferencia A",
@@ -874,6 +933,9 @@ export default function DatabasePage() {
       ];
       const dataToExport = dataToUse.map(s => ({
         "Estado de Pago": s.paymentStatus || 'Pendiente',
+        "Recepción DC": s.recepcionDCStatus ? 'Recibido' : 'Pendiente',
+        "Recepción DC Por": s.recepcionDCLastUpdatedBy || 'N/A',
+        "Recepción DC Fecha": s.recepcionDCLastUpdatedAt && s.recepcionDCLastUpdatedAt instanceof Date ? format(s.recepcionDCLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "ID Solicitud": s.solicitudId,
         "Fecha de Solicitud": s.examDate instanceof Date ? format(s.examDate, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "NE": s.examNe,
@@ -908,12 +970,12 @@ export default function DatabasePage() {
         "Constancia 2%": s.constanciasNoRetencion ? (s.constanciasNoRetencion2 ? 'Sí' : 'No') : 'N/A',
         "Pago de Servicios": s.pagoServicios ? 'Sí' : 'No',
         "Tipo de Servicio": s.pagoServicios ? (s.tipoServicio === 'OTROS' ? s.otrosTipoServicio : s.tipoServicio) || 'N/A' : 'N/A',
-        "Otro Tipo de Servicio": s.pagoServicios && s.tipoServicio === 'OTROS' ? s.otrosTipoServicio || 'N/A' : 'N/A',
+        "Otro Tipo de Servicio": s.pagoServicios && s.tipoServicio === 'OTROS' ? s.otrosTipoServicio || 'N/A' : 'N/A', 
         "Factura Servicio": s.pagoServicios ? s.facturaServicio || 'N/A' : 'N/A',
         "Institución Servicio": s.pagoServicios ? s.institucionServicio || 'N/A' : 'N/A',
         "Correo Notificación": s.correo || 'N/A',
         "Observación": s.observation || 'N/A',
-        "Usuario (De)": s.examManager, 
+        "Usuario (De)": s.examManager,
         "Fecha de Guardado": s.savedAt instanceof Date ? format(s.savedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "Actualizado Por (Pago)": s.paymentStatusLastUpdatedBy || 'N/A',
         "Fecha Actualización (Pago)": s.paymentStatusLastUpdatedAt && s.paymentStatusLastUpdatedAt instanceof Date ? format(s.paymentStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
@@ -926,45 +988,50 @@ export default function DatabasePage() {
     switch (searchType) {
       case "ne":
       case "solicitudId":
-        return <Input type="text" placeholder={searchType === "ne" ? "Ingrese NE (Ej: NX1-12345)" : "Ingrese ID Solicitud Completo"} value={searchTermText} onChange={(e) => setSearchTermText(e.target.value)} className="flex-grow" aria-label="Término de búsqueda" />;
       case "manager":
         return (
-          <div className="flex-grow space-y-3">
+         <div className="flex-grow space-y-3">
             <Input
               type="text"
-              placeholder="Ingrese Usuario (Guardado Por)"
+              placeholder={
+                searchType === "ne" ? "Ingrese NE (Ej: NX1-12345)" :
+                searchType === "solicitudId" ? "Ingrese ID Solicitud Completo" :
+                "Ingrese Usuario (Guardado Por)"
+              }
               value={searchTermText}
               onChange={(e) => setSearchTermText(e.target.value)}
               className="w-full"
-              aria-label="Término de búsqueda de usuario"
+              aria-label="Término de búsqueda"
             />
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Filtrar por rango de fechas (Opcional):</Label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !datePickerStartDate && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {datePickerStartDate ? format(datePickerStartDate, "PPP", { locale: es }) : <span>Fecha Inicio</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={datePickerStartDate} onSelect={setDatePickerStartDate} initialFocus locale={es} />
-                  </PopoverContent>
-                </Popover>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !datePickerEndDate && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {datePickerEndDate ? format(datePickerEndDate, "PPP", { locale: es }) : <span>Fecha Fin</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={datePickerEndDate} onSelect={setDatePickerEndDate} initialFocus locale={es} />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
+            {searchType === "manager" && (
+                <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Filtrar por rango de fechas (Opcional):</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !datePickerStartDate && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {datePickerStartDate ? format(datePickerStartDate, "PPP", { locale: es }) : <span>Fecha Inicio</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={datePickerStartDate} onSelect={setDatePickerStartDate} initialFocus locale={es} />
+                    </PopoverContent>
+                    </Popover>
+                    <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !datePickerEndDate && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {datePickerEndDate ? format(datePickerEndDate, "PPP", { locale: es }) : <span>Fecha Fin</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={datePickerEndDate} onSelect={setDatePickerEndDate} initialFocus locale={es} />
+                    </PopoverContent>
+                    </Popover>
+                </div>
+                </div>
+            )}
           </div>
         );
       case "dateToday": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes de hoy.</p>;
@@ -1023,6 +1090,9 @@ export default function DatabasePage() {
               <Select value={searchType} onValueChange={(value) => { setSearchType(value as SearchType); setSearchTermText(''); setSelectedDate(undefined); setDatePickerStartDate(undefined); setDatePickerEndDate(undefined); setFetchedSolicitudes(null); setError(null); setDuplicateWarning(null); setCurrentSearchTermForDisplay(''); }}>
                   <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue placeholder="Tipo de búsqueda" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="ne">Por NE</SelectItem>
+                    <SelectItem value="solicitudId">Por ID Solicitud</SelectItem>
+                    <SelectItem value="manager">Por Usuario (Guardado Por)</SelectItem>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
                     <SelectItem value="dateCurrentMonth">Por Fecha (Mes Actual)</SelectItem>
                     <SelectItem value="dateSpecific">Por Fecha (Específica)</SelectItem>
@@ -1046,6 +1116,7 @@ export default function DatabasePage() {
                 searchTerm={currentSearchTermForDisplay}
                 currentUserRole={user?.role}
                 onUpdatePaymentStatus={handleUpdatePaymentStatus}
+                onUpdateRecepcionDCStatus={handleUpdateRecepcionDCStatus}
                 onOpenMessageDialog={openMessageDialog}
                 onViewDetails={handleViewDetailsInline}
                 filterSolicitudIdInput={filterSolicitudIdInput}
@@ -1066,7 +1137,7 @@ export default function DatabasePage() {
                 setFilterReferenciaInput={setFilterReferenciaInput}
                 filterGuardadoPorInput={filterGuardadoPorInput}
                 setFilterGuardadoPorInput={setFilterGuardadoPorInput}
-                filterEstadoSolicitudInput={filterEstadoSolicitudInput} 
+                filterEstadoSolicitudInput={filterEstadoSolicitudInput}
                 setFilterEstadoSolicitudInput={setFilterEstadoSolicitudInput}
                 duplicateWarning={duplicateWarning}
               />
@@ -1086,7 +1157,7 @@ export default function DatabasePage() {
             <DialogTitle>Añadir Mensaje de Error para Solicitud</DialogTitle>
             <DialogDescription>
               Solicitud ID: {currentSolicitudIdForMessage}. Si guarda un mensaje, el estado se marcará como &quot;Error&quot;.
-              Si guarda un mensaje vacío y el estado actual es un error, se limpiará el estado de error.
+              Si guarda un mensaje vacío y el estado actual es un error o pagado, se limpiará el estado de error/pago (pasará a pendiente).
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -1104,3 +1175,4 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
+    
