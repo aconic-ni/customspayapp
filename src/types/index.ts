@@ -122,6 +122,10 @@ export interface SolicitudRecord {
   paymentStatus?: string;
   paymentStatusLastUpdatedAt?: Date;
   paymentStatusLastUpdatedBy?: string;
+
+  recepcionDCStatus?: boolean;
+  recepcionDCLastUpdatedAt?: Date;
+  recepcionDCLastUpdatedBy?: string;
 }
 
 
