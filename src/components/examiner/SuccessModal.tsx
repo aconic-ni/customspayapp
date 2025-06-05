@@ -105,11 +105,11 @@ export function SuccessModal() {
           savedAt: FirestoreTimestamp.fromDate(new Date()), 
           savedBy: user.email,
           
-          paymentStatus: null, 
-          paymentStatusLastUpdatedBy: null,
+          paymentStatus: null as any, 
+          paymentStatusLastUpdatedBy: null as any,
 
           recepcionDCStatus: false, 
-          recepcionDCLastUpdatedBy: null,
+          recepcionDCLastUpdatedBy: null as any,
         };
 
         const solicitudDocRef = doc(db, "SolicitudCheques", solicitud.id);
@@ -219,3 +219,4 @@ export function SuccessModal() {
     </Dialog>
   );
 }
+
