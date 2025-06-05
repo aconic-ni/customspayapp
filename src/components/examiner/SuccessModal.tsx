@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useAppContext, SolicitudStep } from '@/context/AppContext';
 import { CheckCircle, FilePlus, RotateCcw, Save, Mail } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, Timestamp as FirestoreTimestamp } from "firebase/firestore"; // Renamed Timestamp
+import { doc, setDoc, Timestamp as FirestoreTimestamp } from "firebase/firestore"; 
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { SolicitudRecord, InitialDataContext, SolicitudData } from '@/types';
@@ -53,19 +53,16 @@ export function SuccessModal() {
           continue;
         }
 
-        // Ensure monto is a number or null
         const montoAsNumber = typeof solicitud.monto === 'number' ? solicitud.monto : null;
         if (solicitud.monto !== undefined && montoAsNumber === null) {
             console.warn(`Monto for solicitud ${solicitud.id} was not a valid number, saving as null.`);
         }
 
-
-        // Prepare data for Firestore, converting JS Dates to Firestore Timestamps
-        const dataToSave = {
+        const dataToSave: Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt' | 'recepcionDCLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp, recepcionDCLastUpdatedAt?: FirestoreTimestamp } = {
           examNe: initialContextData.ne,
           examReference: initialContextData.reference || null,
           examManager: initialContextData.manager,
-          examDate: FirestoreTimestamp.fromDate(initialContextData.date), // Convert JS Date to Firestore Timestamp
+          examDate: FirestoreTimestamp.fromDate(initialContextData.date), 
           examRecipient: initialContextData.recipient,
 
           solicitudId: solicitud.id,
@@ -105,9 +102,14 @@ export function SuccessModal() {
           correo: solicitud.correo || null,
           observation: solicitud.observation || null,
 
-          savedAt: FirestoreTimestamp.fromDate(new Date()), // Current time as Firestore Timestamp
+          savedAt: FirestoreTimestamp.fromDate(new Date()), 
           savedBy: user.email,
-          // paymentStatus fields are not set here, they are updated from database page
+          
+          paymentStatus: undefined, // Not set here
+          paymentStatusLastUpdatedBy: undefined, // Not set here
+
+          recepcionDCStatus: false, // Initialize to false
+          recepcionDCLastUpdatedBy: undefined, // Not set here
         };
 
         const solicitudDocRef = doc(db, "SolicitudCheques", solicitud.id);
@@ -184,11 +186,6 @@ export function SuccessModal() {
            <div className="text-center text-muted-foreground space-y-3">
               <div>La solicitud de cheque ha sido registrada correctamente.</div>
               {initialContextData?.manager && <div>Gracias por tu desempeño, {initialContextData.manager}.</div>}
-              {/* 
-              <div className="text-sm mt-4 mb-2">
-                 Puedes añadir imágenes/soportes del predio/solicitud (enlace a configurar).
-              </div>
-              */}
            </div>
         </DialogDescription>
 
