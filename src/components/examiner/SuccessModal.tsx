@@ -58,7 +58,7 @@ export function SuccessModal() {
             console.warn(`Monto for solicitud ${solicitud.id} was not a valid number, saving as null.`);
         }
 
-        const dataToSave: Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt' | 'recepcionDCLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp, recepcionDCLastUpdatedAt?: FirestoreTimestamp } = {
+        const dataToSave: Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt' | 'recepcionDCLastUpdatedAt' | 'emailMinutaLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp, recepcionDCLastUpdatedAt?: FirestoreTimestamp, emailMinutaLastUpdatedAt?: FirestoreTimestamp } = {
           examNe: initialContextData.ne,
           examReference: initialContextData.reference || null,
           examManager: initialContextData.manager,
@@ -110,6 +110,11 @@ export function SuccessModal() {
 
           recepcionDCStatus: false, 
           recepcionDCLastUpdatedBy: null as any,
+
+          emailMinutaStatus: false,
+          emailMinutaLastUpdatedBy: null,
+          // emailMinutaLastUpdatedAt is optional, will be set upon actual update
+          commentsCount: 0, // Initialize comments count
         };
 
         const solicitudDocRef = doc(db, "SolicitudCheques", solicitud.id);
@@ -219,4 +224,3 @@ export function SuccessModal() {
     </Dialog>
   );
 }
-
