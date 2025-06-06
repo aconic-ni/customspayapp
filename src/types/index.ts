@@ -1,4 +1,3 @@
-
 import type { Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 
 // Represents the data collected in the initial form, held in AppContext
@@ -126,6 +125,12 @@ export interface SolicitudRecord {
   recepcionDCStatus?: boolean;
   recepcionDCLastUpdatedAt?: Date;
   recepcionDCLastUpdatedBy: string | null; 
+
+  emailMinutaStatus?: boolean;
+  emailMinutaLastUpdatedAt?: Date;
+  emailMinutaLastUpdatedBy: string | null;
+
+  commentsCount?: number; // Added for comments counter
 }
 
 // New type for comments
@@ -146,4 +151,3 @@ export interface ExportableSolicitudContextData extends Omit<InitialDataContext,
   savedAt?: Date | FirestoreTimestamp | null;
   savedBy?: string | null;
 }
-
