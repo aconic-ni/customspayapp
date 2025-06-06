@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import type { SolicitudRecord, InitialDataContext } from '@/types';
 import { Loader2, ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle as they are not used directly here for the main card
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -64,10 +64,10 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
-            // Perform robust conversion from Firestore data to SolicitudRecord
             const examDate = data.examDate instanceof FirestoreTimestamp ? data.examDate.toDate() : (data.examDate instanceof Date ? data.examDate : undefined);
             const savedAt = data.savedAt instanceof FirestoreTimestamp ? data.savedAt.toDate() : (data.savedAt instanceof Date ? data.savedAt : undefined);
             const paymentStatusLastUpdatedAt = data.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? data.paymentStatusLastUpdatedAt.toDate() : (data.paymentStatusLastUpdatedAt instanceof Date ? data.paymentStatusLastUpdatedAt : undefined);
+            const recepcionDCLastUpdatedAt = data.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? data.recepcionDCLastUpdatedAt.toDate() : (data.recepcionDCLastUpdatedAt instanceof Date ? data.recepcionDCLastUpdatedAt : undefined);
 
             setSolicitud({
               examNe: data.examNe || '',
@@ -110,9 +110,12 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
               observation: data.observation || null,
               savedAt: savedAt,
               savedBy: data.savedBy || null,
-              paymentStatus: data.paymentStatus || undefined,
+              paymentStatus: data.paymentStatus || null, // Ensure null default
               paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
-              paymentStatusLastUpdatedBy: data.paymentStatusLastUpdatedBy || undefined,
+              paymentStatusLastUpdatedBy: data.paymentStatusLastUpdatedBy || null, // Ensure null default
+              recepcionDCStatus: data.recepcionDCStatus ?? false, // Default to false if undefined
+              recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
+              recepcionDCLastUpdatedBy: data.recepcionDCLastUpdatedBy || null, // Default to null if undefined
             });
           } else {
             setError("Solicitud no encontrada.");
@@ -171,7 +174,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
   const initialDataForDisplay: Partial<InitialDataContext> = {
     recipient: solicitud.examRecipient,
     manager: solicitud.examManager,
-    date: solicitud.examDate, // Already a Date object due to fetching logic
+    date: solicitud.examDate,
     ne: solicitud.examNe,
     reference: solicitud.examReference || undefined,
   };
@@ -326,3 +329,4 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     </div>
   );
 }
+    
