@@ -68,6 +68,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
             const savedAt = data.savedAt instanceof FirestoreTimestamp ? data.savedAt.toDate() : (data.savedAt instanceof Date ? data.savedAt : undefined);
             const paymentStatusLastUpdatedAt = data.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? data.paymentStatusLastUpdatedAt.toDate() : (data.paymentStatusLastUpdatedAt instanceof Date ? data.paymentStatusLastUpdatedAt : undefined);
             const recepcionDCLastUpdatedAt = data.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? data.recepcionDCLastUpdatedAt.toDate() : (data.recepcionDCLastUpdatedAt instanceof Date ? data.recepcionDCLastUpdatedAt : undefined);
+            const emailMinutaLastUpdatedAt = data.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? data.emailMinutaLastUpdatedAt.toDate() : (data.emailMinutaLastUpdatedAt instanceof Date ? data.emailMinutaLastUpdatedAt : undefined);
 
             setSolicitud({
               examNe: data.examNe || '',
@@ -110,12 +111,16 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
               observation: data.observation || null,
               savedAt: savedAt,
               savedBy: data.savedBy || null,
-              paymentStatus: data.paymentStatus || null, // Ensure null default
+              paymentStatus: data.paymentStatus || null,
               paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
-              paymentStatusLastUpdatedBy: data.paymentStatusLastUpdatedBy || null, // Ensure null default
-              recepcionDCStatus: data.recepcionDCStatus ?? false, // Default to false if undefined
+              paymentStatusLastUpdatedBy: data.paymentStatusLastUpdatedBy || null,
+              recepcionDCStatus: data.recepcionDCStatus ?? false,
               recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
-              recepcionDCLastUpdatedBy: data.recepcionDCLastUpdatedBy || null, // Default to null if undefined
+              recepcionDCLastUpdatedBy: data.recepcionDCLastUpdatedBy || null,
+              emailMinutaStatus: data.emailMinutaStatus ?? false,
+              emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
+              emailMinutaLastUpdatedBy: data.emailMinutaLastUpdatedBy || null,
+              commentsCount: data.commentsCount || 0,
             });
           } else {
             setError("Solicitud no encontrada.");
