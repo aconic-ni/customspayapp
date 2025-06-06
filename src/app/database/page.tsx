@@ -1,3 +1,4 @@
+
 "use client";
 import { useState, useEffect, type FormEvent, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer } from 'firebase/firestore';
 import type { SolicitudRecord, CommentRecord } from '@/types';
 import { downloadExcelFileFromTable } from '@/lib/fileExporter';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
@@ -82,6 +83,7 @@ interface SearchResultsTableProps {
   currentUserRole?: string;
   onUpdatePaymentStatus: (solicitudId: string, newPaymentStatus: string | null) => Promise<void>;
   onUpdateRecepcionDCStatus: (solicitudId: string, status: boolean) => Promise<void>;
+  onUpdateEmailMinutaStatus: (solicitudId: string, status: boolean) => Promise<void>;
   onOpenMessageDialog: (solicitudId: string) => void;
   onViewDetails: (solicitud: SolicitudRecord) => void;
   onOpenCommentsDialog: (solicitudId: string) => void;
@@ -106,6 +108,7 @@ interface SearchResultsTableProps {
   filterEstadoSolicitudInput: string;
   setFilterEstadoSolicitudInput: (value: string) => void;
   duplicateWarning?: string | null;
+  duplicateSolicitudIds?: string[];
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -115,6 +118,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   currentUserRole,
   onUpdatePaymentStatus,
   onUpdateRecepcionDCStatus,
+  onUpdateEmailMinutaStatus,
   onOpenMessageDialog,
   onViewDetails,
   onOpenCommentsDialog,
@@ -139,6 +143,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   filterEstadoSolicitudInput,
   setFilterEstadoSolicitudInput,
   duplicateWarning,
+  duplicateSolicitudIds,
 }) => {
   const { toast } = useToast();
   const { user } = useAuth(); 
@@ -174,16 +179,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
           <Table>
             <TableHeader className="bg-secondary/50">
               <TableRow>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                  Estado Solicitud
-                  <Input
-                    type="text"
-                    placeholder="Filtrar Estado Sol..."
-                    value={filterEstadoSolicitudInput}
-                    onChange={(e) => setFilterEstadoSolicitudInput(e.target.value)}
-                    className="mt-1 h-8 text-xs"
-                  />
-                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado de Pago
                   <Input
@@ -195,7 +191,26 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   />
                 </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                  Recepción Doc.
+                  <div className="flex flex-col items-start">
+                    <span>Recepción</span>
+                    <span>Doc.</span>
+                  </div>
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                  <div className="flex flex-col items-start">
+                    <span>Email</span>
+                    <span>Minuta</span>
+                  </div>
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                  Estado Solicitud
+                  <Input
+                    type="text"
+                    placeholder="Filtrar Estado Sol..."
+                    value={filterEstadoSolicitudInput}
+                    onChange={(e) => setFilterEstadoSolicitudInput(e.target.value)}
+                    className="mt-1 h-8 text-xs"
+                  />
                 </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   ID Solicitud
@@ -208,10 +223,10 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   />
                 </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                  Fecha de Solicitud
+                  Fecha
                   <Input
                     type="text"
-                    placeholder="Filtrar Fecha..."
+                    placeholder="Filtrar Fecha (dd/MM/yy)..."
                     value={filterFechaSolicitudInput}
                     onChange={(e) => setFilterFechaSolicitudInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
@@ -279,14 +294,62 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     readOnly={currentUserRole === 'autorevisor'}
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="bg-card divide-y divide-border">
-              {solicitudes.map((solicitud) => (
-                <TableRow key={solicitud.solicitudId} className="hover:bg-muted/50">
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
-                    {renderSolicitudStatusBadges(solicitud)}
+              {solicitudes.map((solicitud) => {
+                const isDuplicate = !!duplicateSolicitudIds && duplicateSolicitudIds.includes(solicitud.solicitudId);
+                return (
+                <TableRow 
+                  key={solicitud.solicitudId} 
+                  className={cn({
+                    'bg-yellow-50 dark:bg-yellow-800/30 hover:bg-yellow-100 dark:hover:bg-yellow-800/40': solicitud.soporte && !isDuplicate,
+                    'bg-red-50 dark:bg-red-800/30 hover:bg-red-100 dark:hover:bg-red-800/40': isDuplicate,
+                    'hover:bg-muted/50': !solicitud.soporte && !isDuplicate,
+                  })}
+                >
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center space-x-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onViewDetails(solicitud)}
+                                className="px-2 py-1 h-auto"
+                                aria-label="Ver Detalles"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Ver Detalles</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onOpenCommentsDialog(solicitud.solicitudId)}
+                                className="px-2 py-1 h-auto"
+                                aria-label="Comentarios"
+                              >
+                                <MessageSquareText className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Comentarios</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <Badge variant="secondary" className="h-6 min-w-[1.5rem] flex items-center justify-center px-1.5 py-0.5 text-xs">
+                          {solicitud.commentsCount ?? 0}
+                        </Badge>
+                    </div>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                     {currentUserRole === 'calificador' ? (
@@ -357,7 +420,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                                 onCheckedChange={(checked) => {
                                     onUpdateRecepcionDCStatus(solicitud.solicitudId, !!checked);
                                 }}
-                                aria-label="Marcar como recibido / pendiente"
+                                aria-label="Marcar como recibido / pendiente de documento"
                             />
                             {solicitud.recepcionDCStatus ? (
                                 <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center">
@@ -395,10 +458,59 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                         </div>
                      )}
                   </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
+                    {currentUserRole === 'calificador' ? (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={!!solicitud.emailMinutaStatus}
+                          onCheckedChange={(checked) => {
+                            onUpdateEmailMinutaStatus(solicitud.solicitudId, !!checked);
+                          }}
+                          aria-label="Marcar como notificado / pendiente de email minuta"
+                        />
+                        {solicitud.emailMinutaStatus ? (
+                          <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200 flex items-center">
+                            <CheckSquareIcon className="h-3.5 w-3.5 mr-1"/> Notificado
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">Pendiente</Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1">
+                        {solicitud.emailMinutaStatus ? (
+                          <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200 flex items-center">
+                             <CheckSquareIcon className="h-3.5 w-3.5 mr-1"/> Notificado
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">Pendiente</Badge>
+                        )}
+                        {(solicitud.emailMinutaLastUpdatedAt || solicitud.emailMinutaLastUpdatedBy) && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                  <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">
+                                <p>Última actualización (Email Minuta):</p>
+                                {solicitud.emailMinutaLastUpdatedBy && <p>Por: {solicitud.emailMinutaLastUpdatedBy}</p>}
+                                {solicitud.emailMinutaLastUpdatedAt && solicitud.emailMinutaLastUpdatedAt instanceof Date && <p>Fecha: {format(solicitud.emailMinutaLastUpdatedAt, "Pp", { locale: es })}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
+                    {renderSolicitudStatusBadges(solicitud)}
+                  </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{solicitud.solicitudId}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                     {solicitud.examDate instanceof Date
-                      ? format(solicitud.examDate, "PPP", { locale: es })
+                      ? format(solicitud.examDate, "dd/MM/yy", { locale: es })
                       : 'N/A'}
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examNe}</TableCell>
@@ -407,28 +519,9 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.declaracionNumero || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examReference || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.savedBy || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onViewDetails(solicitud)}
-                          className="px-2 py-1 h-auto"
-                        >
-                          <Eye className="mr-1 h-3.5 w-3.5" /> Ver
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onOpenCommentsDialog(solicitud.solicitudId)}
-                          className="px-2 py-1 h-auto"
-                        >
-                          <MessageSquareText className="mr-1 h-3.5 w-3.5" /> Comentarios
-                        </Button>
-                    </div>
-                  </TableCell>
                 </TableRow>
-              ))}
+              );
+            })}
             </TableBody>
           </Table>
         </div>
@@ -453,7 +546,10 @@ export default function DatabasePage() {
   const [fetchedSolicitudes, setFetchedSolicitudes] = useState<SolicitudRecord[] | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [currentSearchTermForDisplay, setCurrentSearchTermForDisplay] = useState('');
+  
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [duplicateSolicitudIds, setDuplicateSolicitudIds] = useState<string[]>([]);
+
 
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
   const [currentSolicitudIdForMessage, setCurrentSolicitudIdForMessage] = useState<string | null>(null);
@@ -508,9 +604,7 @@ export default function DatabasePage() {
         if (!filterValue.trim()) return data;
         const searchTerm = filterValue.toLowerCase().trim();
         const filtered = data.filter(item => filterFn(item, searchTerm));
-        // If filter results in empty but original data was not, it means filter was too restrictive.
-        // However, if original data was already empty, or if filter finds results, return filtered.
-        return filtered.length > 0 || data.length === 0 ? filtered : data; // Corrected logic here for empty filter results
+        return filtered.length > 0 || data.length === 0 ? filtered : data; 
     };
 
     accumulatedData = applyFilter(accumulatedData, filterEstadoSolicitudInput, (s, term) => {
@@ -531,7 +625,7 @@ export default function DatabasePage() {
         s.solicitudId.toLowerCase().includes(term)
     );
     accumulatedData = applyFilter(accumulatedData, filterFechaSolicitudInput, (s, term) => {
-        const dateText = s.examDate && s.examDate instanceof Date ? format(s.examDate, "PPP", { locale: es }) : 'N/A';
+        const dateText = s.examDate && s.examDate instanceof Date ? format(s.examDate, "dd/MM/yy", { locale: es }) : 'N/A';
         return dateText.toLowerCase().includes(term);
     });
     accumulatedData = applyFilter(accumulatedData, filterNEInput, (s, term) =>
@@ -639,6 +733,36 @@ export default function DatabasePage() {
     }
   }, [user, toast]);
 
+  const handleUpdateEmailMinutaStatus = useCallback(async (solicitudId: string, status: boolean) => {
+    if (!user || !user.email) {
+      toast({ title: "Error", description: "Usuario no autenticado.", variant: "destructive" });
+      return;
+    }
+    const docRef = doc(db, "SolicitudCheques", solicitudId);
+    try {
+      await updateDoc(docRef, {
+        emailMinutaStatus: status,
+        emailMinutaLastUpdatedAt: serverTimestamp(),
+        emailMinutaLastUpdatedBy: user.email,
+      });
+      toast({ title: "Éxito", description: `Estado de Email Minuta actualizado para ${solicitudId}.` });
+      setFetchedSolicitudes(prev =>
+        prev?.map(s =>
+          s.solicitudId === solicitudId
+            ? { ...s,
+                emailMinutaStatus: status,
+                emailMinutaLastUpdatedAt: new Date(),
+                emailMinutaLastUpdatedBy: user.email!
+              }
+            : s
+        ) || null
+      );
+    } catch (err) {
+      console.error("Error updating email minuta status: ", err);
+      toast({ title: "Error", description: "No se pudo actualizar el estado de Email Minuta.", variant: "destructive" });
+    }
+  }, [user, toast]);
+
 
   const openMessageDialog = (solicitudId: string) => {
     setCurrentSolicitudIdForMessage(solicitudId);
@@ -667,7 +791,7 @@ export default function DatabasePage() {
   // Comments Dialog functions
   const openCommentsDialog = async (solicitudId: string) => {
     setCurrentSolicitudIdForComments(solicitudId);
-    setComments([]); // Clear previous comments
+    setComments([]); 
     setIsLoadingComments(true);
     setIsCommentsDialogOpen(true);
 
@@ -712,18 +836,28 @@ export default function DatabasePage() {
     setIsPostingComment(true);
     try {
       const commentsCollectionRef = collection(db, "SolicitudCheques", currentSolicitudIdForComments, "comments");
-      const newComment: Omit<CommentRecord, 'id' | 'createdAt'> & { createdAt: any } = { // Use 'any' for serverTimestamp() initially
+      const newCommentData: Omit<CommentRecord, 'id' | 'createdAt'> & { createdAt: any } = { 
         solicitudId: currentSolicitudIdForComments,
         text: newCommentText.trim(),
         userId: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
       };
-      const docRef = await addDoc(commentsCollectionRef, newComment);
+      const docRef = await addDoc(commentsCollectionRef, newCommentData);
       
-      setComments(prev => [...prev, { ...newComment, id: docRef.id, createdAt: new Date() } as CommentRecord]);
+      setComments(prev => [...prev, { ...newCommentData, id: docRef.id, createdAt: new Date() } as CommentRecord]);
       setNewCommentText('');
       toast({ title: "Éxito", description: "Comentario publicado." });
+
+      // Optimistically update commentsCount in fetchedSolicitudes
+      setFetchedSolicitudes(prevSolicitudes =>
+        prevSolicitudes?.map(s =>
+          s.solicitudId === currentSolicitudIdForComments
+            ? { ...s, commentsCount: (s.commentsCount ?? 0) + 1 }
+            : s
+        ) || null
+      );
+
     } catch (err) {
       console.error("Error posting comment: ", err);
       toast({ title: "Error", description: "No se pudo publicar el comentario.", variant: "destructive" });
@@ -760,6 +894,7 @@ export default function DatabasePage() {
     setError(null);
     setFetchedSolicitudes(null);
     setDuplicateWarning(null);
+    setDuplicateSolicitudIds([]);
     setCurrentSearchTermForDisplay('');
     setIsDetailViewVisible(false);
     setSolicitudToViewInline(null);
@@ -836,12 +971,23 @@ export default function DatabasePage() {
       if (q) {
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
-          let data = querySnapshot.docs.map(docSnap => {
+          const dataPromises = querySnapshot.docs.map(async (docSnap) => {
             const docData = docSnap.data();
             const examDateValue = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : undefined);
             const savedAtValue = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : undefined);
             const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
             const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
+            const emailMinutaLastUpdatedAt = docData.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? docData.emailMinutaLastUpdatedAt.toDate() : (docData.emailMinutaLastUpdatedAt instanceof Date ? docData.emailMinutaLastUpdatedAt : undefined);
+            
+            let commentsCount = 0;
+            try {
+              const commentsColRef = collection(db, "SolicitudCheques", docSnap.id, "comments");
+              const commentsSnapshot = await getCountFromServer(commentsColRef);
+              commentsCount = commentsSnapshot.data().count;
+            } catch (countError) {
+              console.error(`Error fetching comments count for ${docSnap.id}: `, countError);
+            }
+
             return {
               ...docData,
               solicitudId: docSnap.id,
@@ -853,6 +999,9 @@ export default function DatabasePage() {
               recepcionDCStatus: docData.recepcionDCStatus ?? false,
               recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
               recepcionDCLastUpdatedBy: docData.recepcionDCLastUpdatedBy || null,
+              emailMinutaStatus: docData.emailMinutaStatus ?? false,
+              emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
+              emailMinutaLastUpdatedBy: docData.emailMinutaLastUpdatedBy || null,
               examNe: docData.examNe || '', 
               examReference: docData.examReference || null,
               examManager: docData.examManager || '',
@@ -890,8 +1039,11 @@ export default function DatabasePage() {
               correo: docData.correo || null,
               observation: docData.observation || null,
               savedBy: docData.savedBy || null,
+              commentsCount: commentsCount,
             } as SolicitudRecord;
           });
+
+          const data = await Promise.all(dataPromises);
           setFetchedSolicitudes(data);
 
           if (data && data.length > 1) {
@@ -916,9 +1068,15 @@ export default function DatabasePage() {
             });
 
             if (duplicateGroups.length > 0) {
+              const allDuplicateIds = duplicateGroups.flat();
+              setDuplicateSolicitudIds(allDuplicateIds);
               const duplicateIdsText = duplicateGroups.map(group => `(${group.join(', ')})`).join('; ');
               setDuplicateWarning(`Posible acción duplicada. Revise los siguientes Documentos ID con NE, Monto y Moneda idénticos: ${duplicateIdsText}.`);
+            } else {
+                setDuplicateSolicitudIds([]);
             }
+          } else {
+             setDuplicateSolicitudIds([]);
           }
 
         } else { setError("No se encontraron solicitudes para los criterios ingresados."); }
@@ -945,7 +1103,7 @@ export default function DatabasePage() {
     toast({ title: "Exportando...", description: "Preparando datos para Excel, esto puede tardar unos segundos...", duration: 10000 });
 
     const headers = [
-      "Estado de Pago", "Recepción Doc.", "Recepción Doc. Por", "Recepción Doc. Fecha", "ID Solicitud", "Fecha de Solicitud", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
+      "Estado de Pago", "Recepción Doc.", "Recepción Doc. Por", "Recepción Doc. Fecha", "Email Minuta", "Email Minuta Por", "Email Minuta Fecha", "ID Solicitud", "Fecha", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
       "Cantidad en Letras", "Destinatario Solicitud",
       "Unidad Recaudadora", "Código 1", "Codigo MUR", "Banco", "Otro Banco", "Número de Cuenta", "Moneda de la Cuenta", "Otra Moneda Cuenta",
       "Elaborar Cheque A", "Elaborar Transferencia A",
@@ -959,29 +1117,37 @@ export default function DatabasePage() {
 
     const dataToExportPromises = dataToUse.map(async (s) => {
       let commentsString = 'N/A';
-      try {
-        const commentsCollectionRef = collection(db, "SolicitudCheques", s.solicitudId, "comments");
-        const q = query(commentsCollectionRef, orderBy("createdAt", "asc"));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          commentsString = querySnapshot.docs.map(docSnap => {
-            const data = docSnap.data();
-            const createdAt = data.createdAt instanceof FirestoreTimestamp ? data.createdAt.toDate() : new Date();
-            return `${data.userEmail} - ${format(createdAt, "dd/MM/yy HH:mm", { locale: es })}: ${data.text}`;
-          }).join("\n"); // Join with newline for Excel cell display
+      if (s.commentsCount && s.commentsCount > 0) { // Only fetch if count > 0
+        try {
+            const commentsCollectionRef = collection(db, "SolicitudCheques", s.solicitudId, "comments");
+            const q = query(commentsCollectionRef, orderBy("createdAt", "asc"));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+            commentsString = querySnapshot.docs.map(docSnap => {
+                const data = docSnap.data();
+                const createdAt = data.createdAt instanceof FirestoreTimestamp ? data.createdAt.toDate() : new Date();
+                return `${data.userEmail} - ${format(createdAt, "dd/MM/yy HH:mm", { locale: es })}: ${data.text}`;
+            }).join("\n"); 
+            }
+        } catch (err) {
+            console.error(`Error fetching comments for ${s.solicitudId}: `, err);
+            commentsString = 'Error al cargar comentarios';
         }
-      } catch (err) {
-        console.error(`Error fetching comments for ${s.solicitudId}: `, err);
-        commentsString = 'Error al cargar comentarios';
+      } else if (s.commentsCount === 0) {
+        commentsString = 'Sin comentarios';
       }
+
 
       return {
         "Estado de Pago": s.paymentStatus || 'Pendiente',
         "Recepción Doc.": s.recepcionDCStatus ? 'Recibido' : 'Pendiente',
         "Recepción Doc. Por": s.recepcionDCLastUpdatedBy || 'N/A',
         "Recepción Doc. Fecha": s.recepcionDCLastUpdatedAt && s.recepcionDCLastUpdatedAt instanceof Date ? format(s.recepcionDCLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
+        "Email Minuta": s.emailMinutaStatus ? 'Notificado' : 'Pendiente',
+        "Email Minuta Por": s.emailMinutaLastUpdatedBy || 'N/A',
+        "Email Minuta Fecha": s.emailMinutaLastUpdatedAt && s.emailMinutaLastUpdatedAt instanceof Date ? format(s.emailMinutaLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "ID Solicitud": s.solicitudId,
-        "Fecha de Solicitud": s.examDate instanceof Date ? format(s.examDate, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
+        "Fecha": s.examDate instanceof Date ? format(s.examDate, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "NE": s.examNe,
         "Monto": s.monto,
         "Moneda Monto": s.montoMoneda,
@@ -1094,7 +1260,7 @@ export default function DatabasePage() {
           <CardContent>
             <form onSubmit={handleSearch} className="space-y-4 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Select value={searchType} onValueChange={(value) => { setSearchType(value as SearchType); setSearchTermText(''); setSelectedDate(undefined); setDatePickerStartDate(undefined); setDatePickerEndDate(undefined); setFetchedSolicitudes(null); setError(null); setDuplicateWarning(null); setCurrentSearchTermForDisplay(''); }}>
+              <Select value={searchType} onValueChange={(value) => { setSearchType(value as SearchType); setSearchTermText(''); setSelectedDate(undefined); setDatePickerStartDate(undefined); setDatePickerEndDate(undefined); setFetchedSolicitudes(null); setError(null); setDuplicateWarning(null); setDuplicateSolicitudIds([]); setCurrentSearchTermForDisplay(''); }}>
                   <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue placeholder="Tipo de búsqueda" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
@@ -1124,6 +1290,7 @@ export default function DatabasePage() {
                 currentUserRole={user?.role}
                 onUpdatePaymentStatus={handleUpdatePaymentStatus}
                 onUpdateRecepcionDCStatus={handleUpdateRecepcionDCStatus}
+                onUpdateEmailMinutaStatus={handleUpdateEmailMinutaStatus}
                 onOpenMessageDialog={openMessageDialog}
                 onViewDetails={handleViewDetailsInline}
                 onOpenCommentsDialog={openCommentsDialog}
@@ -1148,6 +1315,7 @@ export default function DatabasePage() {
                 filterEstadoSolicitudInput={filterEstadoSolicitudInput}
                 setFilterEstadoSolicitudInput={setFilterEstadoSolicitudInput}
                 duplicateWarning={duplicateWarning}
+                duplicateSolicitudIds={duplicateSolicitudIds}
               />
             }
             {!fetchedSolicitudes && !isLoading && !error && !currentSearchTermForDisplay && <div className="mt-4 p-4 bg-blue-500/10 text-blue-700 border border-blue-500/30 rounded-md text-center">Seleccione un tipo de búsqueda e ingrese los criterios para ver resultados.</div>}
@@ -1183,7 +1351,7 @@ export default function DatabasePage() {
 
       {/* Comments Dialog */}
       <Dialog open={isCommentsDialogOpen} onOpenChange={closeCommentsDialog}>
-        <DialogContent className="sm:max-w-2xl"> {/* Increased width */}
+        <DialogContent className="sm:max-w-2xl"> 
           <DialogHeader>
             <DialogTitle>Comentarios para Solicitud ID: {currentSolicitudIdForComments}</DialogTitle>
             <DialogDescription>
@@ -1201,14 +1369,14 @@ export default function DatabasePage() {
                 <p className="text-sm text-muted-foreground text-center py-4">No hay comentarios aún.</p>
               ) : (
                 comments.map(comment => (
-                  <div key={comment.id} className="p-2 my-1 border-b bg-card shadow-sm rounded"> {/* Removed base text-xs */}
+                  <div key={comment.id} className="p-2 my-1 border-b bg-card shadow-sm rounded"> 
                     <div className="flex justify-between items-center mb-1">
-                        <p className="font-semibold text-primary text-xs">{comment.userEmail}</p> {/* Added text-xs */}
-                        <p className="text-muted-foreground text-xs"> {/* Added text-xs */}
+                        <p className="font-semibold text-primary text-xs">{comment.userEmail}</p> 
+                        <p className="text-muted-foreground text-xs"> 
                             {format(comment.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}
                         </p>
                     </div>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{comment.text}</p> {/* Changed to text-sm */}
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{comment.text}</p> 
                   </div>
                 ))
               )}
