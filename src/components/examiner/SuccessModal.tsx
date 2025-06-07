@@ -11,13 +11,13 @@ import { useToast } from '@/hooks/use-toast';
 import type { SolicitudRecord } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 
 export function SuccessModal() {
   const { currentStep, setCurrentStep, resetApp, initialContextData, solicitudes } = useAppContext();
   const { user } = useAuth();
   const { toast } = useToast();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
 
   const handleSaveToDatabase = async () => {
     if (!initialContextData || !user || !user.email || !solicitudes || solicitudes.length === 0) {
@@ -60,7 +60,7 @@ export function SuccessModal() {
             console.warn(`Monto for solicitud ${solicitud.id} was not a valid number, saving as null.`);
         }
 
-        const dataToSave: Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt' | 'recepcionDCLastUpdatedAt' | 'emailMinutaLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp, recepcionDCLastUpdatedAt?: FirestoreTimestamp, emailMinutaLastUpdatedAt?: FirestoreTimestamp } = {
+        const dataToSave: Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt' | 'recepcionDCLastUpdatedAt' | 'emailMinutaLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp | null, recepcionDCLastUpdatedAt?: FirestoreTimestamp | null, emailMinutaLastUpdatedAt?: FirestoreTimestamp | null } = {
           examNe: initialContextData.ne,
           examReference: initialContextData.reference || null,
           examManager: initialContextData.manager,
@@ -109,15 +109,15 @@ export function SuccessModal() {
           
           paymentStatus: null, 
           paymentStatusLastUpdatedBy: null,
-          paymentStatusLastUpdatedAt: undefined,
+          paymentStatusLastUpdatedAt: null,
 
           recepcionDCStatus: false, 
           recepcionDCLastUpdatedBy: null,
-          recepcionDCLastUpdatedAt: undefined,
+          recepcionDCLastUpdatedAt: null,
 
           emailMinutaStatus: false,
           emailMinutaLastUpdatedBy: null,
-          emailMinutaLastUpdatedAt: undefined,
+          emailMinutaLastUpdatedAt: null,
           commentsCount: 0,
         };
 
@@ -183,7 +183,6 @@ export function SuccessModal() {
     const isDatabaseAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
     if (isDatabaseAuthorized) {
       router.push('/database');
-      // No longer resetting app state here
     } else {
       toast({
         title: "Acceso Denegado",
@@ -202,9 +201,6 @@ export function SuccessModal() {
         open={currentStep === SolicitudStep.SUCCESS} 
         onOpenChange={(open) => { 
             if (!open) {
-                // When the dialog is closed (e.g., by 'X', Esc, or clicking outside),
-                // set current step to PREVIEW so the modal actually closes
-                // but do not reset the app state.
                 setCurrentStep(SolicitudStep.PREVIEW);
             } 
         }}
@@ -213,12 +209,14 @@ export function SuccessModal() {
         <DialogHeader className="items-center text-center relative">
           <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
           <DialogTitle className="text-xl font-semibold text-foreground">¡Operación Exitosa!</DialogTitle>
-           <DialogClose 
-            // onClick removed, onOpenChange on Dialog handles closing.
+           <DialogClose
+            asChild
             className="absolute right-0 top-0 p-2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
             aria-label="Cerrar"
           >
-            <X className="h-5 w-5 text-muted-foreground" />
+            <Button variant="ghost" size="icon" className="h-auto w-auto p-0">
+             <X className="h-5 w-5 text-muted-foreground" />
+            </Button>
           </DialogClose>
         </DialogHeader>
         <DialogDescription asChild>
