@@ -518,7 +518,26 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.consignatario || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.declaracionNumero || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examReference || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.savedBy || 'N/A'}</TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                     <div className="flex items-center space-x-1">
+                        <span>{solicitud.savedBy || 'N/A'}</span>
+                        {solicitud.savedAt && solicitud.savedAt instanceof Date && (
+                        <TooltipProvider>
+                            <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs">
+                                <p>Guardado el:</p>
+                                <p>{format(solicitud.savedAt, "Pp", { locale: es })}</p>
+                            </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        )}
+                    </div>
+                  </TableCell>
                 </TableRow>
               );
             })}
