@@ -1,21 +1,23 @@
 
 "use client";
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { useAppContext, SolicitudStep } from '@/context/AppContext';
-import { CheckCircle, FilePlus, RotateCcw, Save, Mail } from 'lucide-react';
+import { CheckCircle, FilePlus, RotateCcw, Save, Mail, Database, X } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, Timestamp as FirestoreTimestamp } from "firebase/firestore"; 
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import type { SolicitudRecord, InitialDataContext, SolicitudData } from '@/types';
+import type { SolicitudRecord } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 export function SuccessModal() {
   const { currentStep, setCurrentStep, resetApp, initialContextData, solicitudes } = useAppContext();
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter(); // Initialize useRouter
 
   const handleSaveToDatabase = async () => {
     if (!initialContextData || !user || !user.email || !solicitudes || solicitudes.length === 0) {
@@ -105,16 +107,18 @@ export function SuccessModal() {
           savedAt: FirestoreTimestamp.fromDate(new Date()), 
           savedBy: user.email,
           
-          paymentStatus: null as any, 
-          paymentStatusLastUpdatedBy: null as any,
+          paymentStatus: null, 
+          paymentStatusLastUpdatedBy: null,
+          paymentStatusLastUpdatedAt: undefined,
 
           recepcionDCStatus: false, 
-          recepcionDCLastUpdatedBy: null as any,
+          recepcionDCLastUpdatedBy: null,
+          recepcionDCLastUpdatedAt: undefined,
 
           emailMinutaStatus: false,
           emailMinutaLastUpdatedBy: null,
-          // emailMinutaLastUpdatedAt is optional, will be set upon actual update
-          commentsCount: 0, // Initialize comments count
+          emailMinutaLastUpdatedAt: undefined,
+          commentsCount: 0,
         };
 
         const solicitudDocRef = doc(db, "SolicitudCheques", solicitud.id);
@@ -175,27 +179,57 @@ export function SuccessModal() {
     window.location.href = mailtoLink;
   };
 
+  const handleGoToDatabase = () => {
+    const isDatabaseAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
+    if (isDatabaseAuthorized) {
+      router.push('/database');
+      // No longer resetting app state here
+    } else {
+      toast({
+        title: "Acceso Denegado",
+        description: "Usuario no autorizado para acceder a la base de datos.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (currentStep !== SolicitudStep.SUCCESS) {
     return null;
   }
 
   return (
-    <Dialog open={currentStep === SolicitudStep.SUCCESS} onOpenChange={() => { /* Controlled by AppContext */ }}>
+    <Dialog 
+        open={currentStep === SolicitudStep.SUCCESS} 
+        onOpenChange={(open) => { 
+            if (!open) {
+                // When the dialog is closed (e.g., by 'X', Esc, or clicking outside),
+                // set current step to PREVIEW so the modal actually closes
+                // but do not reset the app state.
+                setCurrentStep(SolicitudStep.PREVIEW);
+            } 
+        }}
+    >
       <DialogContent className="sm:max-w-md">
-        <DialogHeader className="items-center text-center">
+        <DialogHeader className="items-center text-center relative">
           <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
           <DialogTitle className="text-xl font-semibold text-foreground">¡Operación Exitosa!</DialogTitle>
+           <DialogClose 
+            // onClick removed, onOpenChange on Dialog handles closing.
+            className="absolute right-0 top-0 p-2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+            aria-label="Cerrar"
+          >
+            <X className="h-5 w-5 text-muted-foreground" />
+          </DialogClose>
         </DialogHeader>
         <DialogDescription asChild>
            <div className="text-center text-muted-foreground space-y-3">
-              <div>La solicitud de cheque ha sido registrada correctamente.</div>
+              <div>La solicitud de cheque ha sido registrada correctamente. Guardar es la prioridad, dar click a diskette rojo.</div>
               {initialContextData?.manager && <div>Gracias por tu desempeño, {initialContextData.manager}.</div>}
            </div>
         </DialogDescription>
 
         <div className="mt-6 flex flex-col space-y-3 items-center">
-          <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:gap-3 sm:justify-center items-center">
+          <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:gap-3 sm:justify-center items-center w-full">
             <Button
               onClick={handleSaveToDatabase}
               variant="destructive"
@@ -218,6 +252,14 @@ export function SuccessModal() {
             className="w-full btn-secondary mt-3"
           >
             <Mail className="mr-2 h-4 w-4" /> Enviar Correo
+          </Button>
+          <Button 
+            onClick={handleGoToDatabase} 
+            variant="default" 
+            size="default" 
+            className="w-full bg-purple-600 text-white hover:bg-purple-700"
+          >
+            <Database className="mr-2 h-4 w-4" /> Ir a base de datos
           </Button>
         </div>
       </DialogContent>
