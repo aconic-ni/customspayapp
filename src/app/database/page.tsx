@@ -1406,7 +1406,7 @@ export default function DatabasePage() {
             rows={4}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsMessageDialogOpen(false); setMessageText(''); setCurrentSolicitudIdForMessage(null);}}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setIsMessageDialogOpen(false); setMessageText(''); setCurrentSolicitudIdForMessage(null);}}>Salir</Button>
             <Button onClick={handleSaveMessage}>Guardar Mensaje</Button>
           </DialogFooter>
         </DialogContent>
@@ -1458,7 +1458,7 @@ export default function DatabasePage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeCommentsDialog} disabled={isPostingComment}>Cancelar</Button>
+            <Button variant="outline" onClick={closeCommentsDialog} disabled={isPostingComment}>Salir</Button>
             <Button onClick={handlePostComment} disabled={isPostingComment || !newCommentText.trim()}>
                 {isPostingComment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isPostingComment ? 'Publicando...' : 'Publicar Comentario'}
