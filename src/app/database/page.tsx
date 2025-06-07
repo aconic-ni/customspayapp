@@ -540,6 +540,11 @@ export default function DatabasePage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [datePickerStartDate, setDatePickerStartDate] = useState<Date | undefined>(undefined);
   const [datePickerEndDate, setDatePickerEndDate] = useState<Date | undefined>(undefined);
+  
+  const [isSpecificDatePopoverOpen, setIsSpecificDatePopoverOpen] = useState(false);
+  const [isStartDatePopoverOpen, setIsStartDatePopoverOpen] = useState(false);
+  const [isEndDatePopoverOpen, setIsEndDatePopoverOpen] = useState(false);
+
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1211,16 +1216,55 @@ export default function DatabasePage() {
       case "dateCurrentMonth": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes del mes actual.</p>;
       case "dateSpecific":
         return (
-          <Popover>
+          <Popover open={isSpecificDatePopoverOpen} onOpenChange={setIsSpecificDatePopoverOpen}>
             <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full justify-start text-left font-normal flex-grow", !selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}</Button></PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={es} /></PopoverContent>
+            <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    setIsSpecificDatePopoverOpen(false);
+                  }}
+                  initialFocus
+                  locale={es}
+                />
+            </PopoverContent>
           </Popover>
         );
       case "dateRange":
         return (
           <div className="flex flex-col sm:flex-row gap-2 flex-grow">
-            <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerStartDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerStartDate ? format(datePickerStartDate, "PPP", { locale: es }) : <span>Fecha Inicio</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={datePickerStartDate} onSelect={setDatePickerStartDate} initialFocus locale={es} /></PopoverContent></Popover>
-            <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerEndDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerEndDate ? format(datePickerEndDate, "PPP", { locale: es }) : <span>Fecha Fin</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={datePickerEndDate} onSelect={setDatePickerEndDate} initialFocus locale={es} /></PopoverContent></Popover>
+            <Popover open={isStartDatePopoverOpen} onOpenChange={setIsStartDatePopoverOpen}>
+                <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerStartDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerStartDate ? format(datePickerStartDate, "PPP", { locale: es }) : <span>Fecha Inicio</span>}</Button></PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={datePickerStartDate}
+                      onSelect={(date) => {
+                        setDatePickerStartDate(date);
+                        setIsStartDatePopoverOpen(false);
+                      }}
+                      initialFocus
+                      locale={es}
+                    />
+                </PopoverContent>
+            </Popover>
+            <Popover open={isEndDatePopoverOpen} onOpenChange={setIsEndDatePopoverOpen}>
+                <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerEndDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerEndDate ? format(datePickerEndDate, "PPP", { locale: es }) : <span>Fecha Fin</span>}</Button></PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={datePickerEndDate}
+                      onSelect={(date) => {
+                        setDatePickerEndDate(date);
+                        setIsEndDatePopoverOpen(false);
+                      }}
+                      initialFocus
+                      locale={es}
+                    />
+                </PopoverContent>
+            </Popover>
           </div>
         );
       default: return null;
