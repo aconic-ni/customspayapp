@@ -2,7 +2,7 @@
 "use client";
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { FileText, LogOut, UserCircle, Database } from 'lucide-react';
+import { FileText, LogOut, UserCircle, Database, Coins } from 'lucide-react'; // Changed Share2 to Coins
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
@@ -76,6 +76,21 @@ export function AppHeader() {
                   aria-label="Ir a Base de Datos"
                 >
                   <Database className="h-5 w-5" />
+                </Button>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="text-primary hover:bg-purple-600 hover:text-white"
+                  aria-label="Abrir SharePoint"
+                >
+                  <a
+                    href="https://aconisani-my.sharepoint.com/:f:/g/personal/asuntos_juridicos_aconic_com_ni/EnOXe6bS-_pNklppJUJ5emoBmT24g9IJw7pBwci93bDUcw?e=ftBiBS"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Coins className="h-5 w-5" />
+                  </a>
                 </Button>
                 <Button
                   variant="ghost"
