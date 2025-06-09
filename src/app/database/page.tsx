@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText } from 'lucide-react';
+import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer } from 'firebase/firestore';
 import type { SolicitudRecord, CommentRecord } from '@/types';
@@ -87,6 +87,11 @@ interface SearchResultsTableProps {
   onOpenMessageDialog: (solicitudId: string) => void;
   onViewDetails: (solicitud: SolicitudRecord) => void;
   onOpenCommentsDialog: (solicitudId: string) => void;
+  onRefreshSearch: () => void;
+  filterRecpDocsInput: string;
+  setFilterRecpDocsInput: (value: string) => void;
+  filterNotMinutaInput: string;
+  setFilterNotMinutaInput: (value: string) => void;
   filterSolicitudIdInput: string;
   setFilterSolicitudIdInput: (value: string) => void;
   filterNEInput: string;
@@ -122,6 +127,11 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   onOpenMessageDialog,
   onViewDetails,
   onOpenCommentsDialog,
+  onRefreshSearch,
+  filterRecpDocsInput,
+  setFilterRecpDocsInput,
+  filterNotMinutaInput,
+  setFilterNotMinutaInput,
   filterSolicitudIdInput,
   setFilterSolicitudIdInput,
   filterNEInput,
@@ -179,7 +189,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
           <Table>
             <TableHeader className="bg-secondary/50">
               <TableRow>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                    <Button variant="ghost" size="icon" onClick={onRefreshSearch} className="h-6 w-6 p-0 mr-1">
+                        <RotateCw className="h-4 w-4 text-primary" />
+                    </Button>
+                    Acciones
+                </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado de Pago
                   <Input
@@ -191,18 +206,26 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   />
                 </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                  <div className="flex flex-col items-start">
-                    <span>Recepción</span>
-                    <span>Doc.</span>
-                  </div>
+                  RECP. DOCS
+                  <Input
+                    type="text"
+                    placeholder="Filtrar (Recibido/Pendiente)..."
+                    value={filterRecpDocsInput}
+                    onChange={(e) => setFilterRecpDocsInput(e.target.value)}
+                    className="mt-1 h-8 text-xs"
+                  />
                 </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                  <div className="flex flex-col items-start">
-                    <span>Email</span>
-                    <span>Minuta</span>
-                  </div>
+                  NOT. MINUTA
+                  <Input
+                    type="text"
+                    placeholder="Filtrar (Notificado/Pendiente)..."
+                    value={filterNotMinutaInput}
+                    onChange={(e) => setFilterNotMinutaInput(e.target.value)}
+                    className="mt-1 h-8 text-xs"
+                  />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado Solicitud
                   <Input
                     type="text"
@@ -212,7 +235,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Consignatario
                   <Input
                     type="text"
@@ -222,7 +245,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Declaracion
                   <Input
                     type="text"
@@ -242,7 +265,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   NE
                   <Input
                     type="text"
@@ -252,7 +275,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Monto
                   <Input
                     type="text"
@@ -262,7 +285,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Referencia
                   <Input
                     type="text"
@@ -272,7 +295,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Guardado Por
                   <Input
                     type="text"
@@ -284,7 +307,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     readOnly={currentUserRole === 'autorevisor'}
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   ID Solicitud
                   <Input
                     type="text"
@@ -507,7 +530,27 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                     {renderSolicitudStatusBadges(solicitud)}
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.consignatario || 'N/A'}</TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                    {solicitud.consignatario && solicitud.consignatario.length > 21 ? (
+                        <div className="flex items-center space-x-1">
+                        <span>{`${solicitud.consignatario.substring(0, 21)}...`}</span>
+                        <TooltipProvider>
+                            <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+                                <InfoIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs max-w-xs break-words">
+                                <p>{solicitud.consignatario}</p>
+                            </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        </div>
+                    ) : (
+                        solicitud.consignatario || 'N/A'
+                    )}
+                  </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.declaracionNumero || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                     {solicitud.examDate instanceof Date
@@ -598,6 +641,9 @@ export default function DatabasePage() {
   const [filterReferenciaInput, setFilterReferenciaInput] = useState('');
   const [filterGuardadoPorInput, setFilterGuardadoPorInput] = useState('');
   const [filterEstadoSolicitudInput, setFilterEstadoSolicitudInput] = useState('');
+  const [filterRecpDocsInput, setFilterRecpDocsInput] = useState('');
+  const [filterNotMinutaInput, setFilterNotMinutaInput] = useState('');
+
 
   const [solicitudToViewInline, setSolicitudToViewInline] = useState<SolicitudRecord | null>(null);
   const [isDetailViewVisible, setIsDetailViewVisible] = useState(false);
@@ -645,6 +691,14 @@ export default function DatabasePage() {
     accumulatedData = applyFilter(accumulatedData, filterEstadoPagoInput, (s, term) =>
         (s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente").includes(term)
     );
+    accumulatedData = applyFilter(accumulatedData, filterRecpDocsInput, (s, term) => {
+        const statusText = s.recepcionDCStatus ? "recibido" : "pendiente";
+        return statusText.includes(term);
+    });
+    accumulatedData = applyFilter(accumulatedData, filterNotMinutaInput, (s, term) => {
+        const statusText = s.emailMinutaStatus ? "notificado" : "pendiente";
+        return statusText.includes(term);
+    });
     accumulatedData = applyFilter(accumulatedData, filterSolicitudIdInput, (s, term) =>
         s.solicitudId.toLowerCase().includes(term)
     );
@@ -683,6 +737,8 @@ export default function DatabasePage() {
     fetchedSolicitudes,
     filterEstadoSolicitudInput,
     filterEstadoPagoInput,
+    filterRecpDocsInput,
+    filterNotMinutaInput,
     filterSolicitudIdInput,
     filterFechaSolicitudInput,
     filterNEInput,
@@ -912,8 +968,14 @@ export default function DatabasePage() {
     }
   }, [isClient, authLoading, user?.role, user?.email]);
 
-  const handleSearch = async (e?: FormEvent) => {
-    e?.preventDefault();
+  const handleSearch = async (actionConfig?: { event?: FormEvent, preserveFilters?: boolean }) => {
+    const event = actionConfig?.event;
+    const preserveFilters = actionConfig?.preserveFilters ?? false;
+
+    if (event) {
+      event.preventDefault();
+    }
+
     setIsLoading(true);
     setError(null);
     setFetchedSolicitudes(null);
@@ -923,17 +985,21 @@ export default function DatabasePage() {
     setIsDetailViewVisible(false);
     setSolicitudToViewInline(null);
 
-    setFilterEstadoSolicitudInput('');
-    setFilterEstadoPagoInput('');
-    setFilterSolicitudIdInput('');
-    setFilterFechaSolicitudInput('');
-    setFilterNEInput('');
-    setFilterMontoInput('');
-    setFilterConsignatarioInput('');
-    setFilterDeclaracionInput('');
-    setFilterReferenciaInput('');
-    if (user?.role !== 'autorevisor') {
-      setFilterGuardadoPorInput('');
+    if (!preserveFilters) {
+      setFilterEstadoSolicitudInput('');
+      setFilterEstadoPagoInput('');
+      setFilterRecpDocsInput('');
+      setFilterNotMinutaInput('');
+      setFilterSolicitudIdInput('');
+      setFilterFechaSolicitudInput('');
+      setFilterNEInput('');
+      setFilterMontoInput('');
+      setFilterConsignatarioInput('');
+      setFilterDeclaracionInput('');
+      setFilterReferenciaInput('');
+      if (user?.role !== 'autorevisor') {
+        setFilterGuardadoPorInput('');
+      }
     }
 
 
@@ -1321,7 +1387,7 @@ export default function DatabasePage() {
             <CardDescription className="text-muted-foreground">Seleccione un tipo de búsqueda e ingrese los criterios.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSearch} className="space-y-4 mb-6">
+            <form onSubmit={(e) => handleSearch({ event: e })} className="space-y-4 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <Select value={searchType} onValueChange={(value) => { setSearchType(value as SearchType); setSearchTermText(''); setSelectedDate(undefined); setDatePickerStartDate(undefined); setDatePickerEndDate(undefined); setFetchedSolicitudes(null); setError(null); setDuplicateWarning(null); setDuplicateSolicitudIds([]); setCurrentSearchTermForDisplay(''); }}>
                   <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue placeholder="Tipo de búsqueda" /></SelectTrigger>
@@ -1357,6 +1423,11 @@ export default function DatabasePage() {
                 onOpenMessageDialog={openMessageDialog}
                 onViewDetails={handleViewDetailsInline}
                 onOpenCommentsDialog={openCommentsDialog}
+                onRefreshSearch={() => handleSearch({ preserveFilters: true })}
+                filterRecpDocsInput={filterRecpDocsInput}
+                setFilterRecpDocsInput={setFilterRecpDocsInput}
+                filterNotMinutaInput={filterNotMinutaInput}
+                setFilterNotMinutaInput={setFilterNotMinutaInput}
                 filterSolicitudIdInput={filterSolicitudIdInput}
                 setFilterSolicitudIdInput={setFilterSolicitudIdInput}
                 filterNEInput={filterNEInput}
