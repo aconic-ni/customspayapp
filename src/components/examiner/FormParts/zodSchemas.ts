@@ -1,9 +1,10 @@
-
 import { z } from 'zod';
 
 // Renamed from initialInfoSchema
 export const initialDataSchema = z.object({
-  ne: z.string().min(1, "NE es requerido."),
+  ne: z.string()
+    .min(1, "NE es requerido.")
+    .regex(/^[a-zA-Z0-9\s]*$/, "NE solo puede contener letras, números y espacios."),
   reference: z.string().optional(),
   manager: z.string().min(1, "Nombre del Usuario es requerido."),
   date: z.date({ required_error: "Fecha es requerida." }),
