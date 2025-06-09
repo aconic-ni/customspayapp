@@ -212,13 +212,23 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                  ID Solicitud
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Consignatario
                   <Input
                     type="text"
-                    placeholder="Filtrar ID..."
-                    value={filterSolicitudIdInput}
-                    onChange={(e) => setFilterSolicitudIdInput(e.target.value)}
+                    placeholder="Filtrar Consignatario..."
+                    value={filterConsignatarioInput}
+                    onChange={(e) => setFilterConsignatarioInput(e.target.value)}
+                    className="mt-1 h-8 text-xs"
+                  />
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Declaracion
+                  <Input
+                    type="text"
+                    placeholder="Filtrar Declaracion..."
+                    value={filterDeclaracionInput}
+                    onChange={(e) => setFilterDeclaracionInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
@@ -252,26 +262,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Consignatario
-                  <Input
-                    type="text"
-                    placeholder="Filtrar Consignatario..."
-                    value={filterConsignatarioInput}
-                    onChange={(e) => setFilterConsignatarioInput(e.target.value)}
-                    className="mt-1 h-8 text-xs"
-                  />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Declaracion
-                  <Input
-                    type="text"
-                    placeholder="Filtrar Declaracion..."
-                    value={filterDeclaracionInput}
-                    onChange={(e) => setFilterDeclaracionInput(e.target.value)}
-                    className="mt-1 h-8 text-xs"
-                  />
-                </TableHead>
                  <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Referencia
                   <Input
@@ -292,6 +282,16 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                     disabled={currentUserRole === 'autorevisor'}
                     readOnly={currentUserRole === 'autorevisor'}
+                  />
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                  ID Solicitud
+                  <Input
+                    type="text"
+                    placeholder="Filtrar ID..."
+                    value={filterSolicitudIdInput}
+                    onChange={(e) => setFilterSolicitudIdInput(e.target.value)}
+                    className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
               </TableRow>
@@ -507,7 +507,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                     {renderSolicitudStatusBadges(solicitud)}
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{solicitud.solicitudId}</TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.consignatario || 'N/A'}</TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.declaracionNumero || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                     {solicitud.examDate instanceof Date
                       ? format(solicitud.examDate, "dd/MM/yy", { locale: es })
@@ -515,8 +516,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examNe}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{formatCurrencyFetched(solicitud.monto ?? undefined, solicitud.montoMoneda || undefined)}</TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.consignatario || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.declaracionNumero || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{solicitud.examReference || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                      <div className="flex items-center space-x-1">
@@ -538,6 +537,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                         )}
                     </div>
                   </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{solicitud.solicitudId}</TableCell>
                 </TableRow>
               );
             })}
