@@ -6,7 +6,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className={cn("relative w-full overflow-auto max-h-[calc(100vh-380px)]")}> {/* Changed to overflow-auto and added max-h */}
+  <div className={cn("relative w-full overflow-auto max-h-[60vh]")}> {/* Changed max-height calculation */}
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
