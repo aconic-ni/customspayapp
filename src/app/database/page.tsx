@@ -115,8 +115,8 @@ interface SearchResultsTableProps {
   duplicateWarning?: string | null;
   duplicateSets: Map<string, string[]>;
   onResolveDuplicate: (key: string, resolution: "validated_not_duplicate" | "deletion_requested") => void;
-  resolvedDuplicateKeys: string[]; // Keys resolved in current session
-  permanentlyResolvedDuplicateKeys: string[]; // Keys resolved in Firestore
+  resolvedDuplicateKeys: string[];
+  permanentlyResolvedDuplicateKeys: string[];
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -161,19 +161,21 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   resolvedDuplicateKeys,
   permanentlyResolvedDuplicateKeys,
 }) => {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { user } = useAuth();
 
-  // Moved useMemo hooks to the top
   const allDuplicateIdsFromSets = useMemo(() => {
+    if (!solicitudes || solicitudes.length === 0) return [];
     const ids = new Set<string>();
     duplicateSets.forEach(idArray => idArray.forEach(id => ids.add(id)));
     return Array.from(ids);
-  }, [duplicateSets]);
+  }, [duplicateSets, solicitudes]);
 
   const combinedResolvedKeys = useMemo(() => {
+    if (!solicitudes || solicitudes.length === 0) return new Set<string>();
     return new Set([...resolvedDuplicateKeys, ...permanentlyResolvedDuplicateKeys]);
-  }, [resolvedDuplicateKeys, permanentlyResolvedDuplicateKeys]);
+  }, [resolvedDuplicateKeys, permanentlyResolvedDuplicateKeys, solicitudes]);
+
 
   if (!solicitudes || solicitudes.length === 0) {
     let message = "No se encontraron solicitudes para los criterios ingresados.";
@@ -198,7 +200,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
         {duplicateSets.size > 0 && (
           <div className="mt-4 space-y-3">
             {Array.from(duplicateSets.entries()).map(([key, ids]) => {
-              if (combinedResolvedKeys.has(key)) { // Check against combined list
+              if (combinedResolvedKeys.has(key)) {
                 return null;
               }
               const neFromKey = key.split('-')[0];
@@ -237,17 +239,17 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
         )}
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto table-container rounded-lg border">
+        <div className="rounded-lg border"> 
           <Table>
-            <TableHeader className="bg-secondary/50">
-              <TableRow>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+            <TableHeader className="sticky top-0 z-30 bg-background">{/* THEAD is sticky */}
+              <TableRow>{/* TR inside THEAD */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Acciones */}
                     <Button variant="ghost" size="icon" onClick={onRefreshSearch} className="h-6 w-6 p-0 mr-1">
                         <RotateCw className="h-4 w-4 text-primary" />
                     </Button>
                     Acciones
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Acciones */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Estado de Pago */}
                   Estado de Pago
                   <Input
                     type="text"
@@ -256,8 +258,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterEstadoPagoInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Estado de Pago */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start RECP. DOCS */}
                   RECP. DOCS
                   <Input
                     type="text"
@@ -266,8 +268,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterRecpDocsInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End RECP. DOCS */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start NOT. MINUTA */}
                   NOT. MINUTA
                   <Input
                     type="text"
@@ -276,8 +278,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterNotMinutaInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End NOT. MINUTA */}
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Estado Solicitud */}
                   Estado Solicitud
                   <Input
                     type="text"
@@ -286,8 +288,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterEstadoSolicitudInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Estado Solicitud */}
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Consignatario */}
                   Consignatario
                   <Input
                     type="text"
@@ -296,8 +298,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterConsignatarioInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Consignatario */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Declaracion */}
                   Declaracion
                   <Input
                     type="text"
@@ -306,8 +308,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterDeclaracionInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Declaracion */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Fecha */}
                   Fecha
                   <Input
                     type="text"
@@ -316,8 +318,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterFechaSolicitudInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Fecha */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start NE */}
                   NE
                   <Input
                     type="text"
@@ -326,8 +328,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterNEInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End NE */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Monto */}
                   Monto
                   <Input
                     type="text"
@@ -336,8 +338,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterMontoInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Monto */}
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Referencia */}
                   Referencia
                   <Input
                     type="text"
@@ -346,8 +348,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterReferenciaInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Referencia */}
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Guardado Por */}
                   Guardado Por
                   <Input
                     type="text"
@@ -358,8 +360,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     disabled={currentUserRole === 'autorevisor'}
                     readOnly={currentUserRole === 'autorevisor'}
                   />
-                </TableHead>
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                </TableHead>{/* End Guardado Por */}
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start ID Solicitud */}
                   ID Solicitud
                   <Input
                     type="text"
@@ -368,7 +370,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterSolicitudIdInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>
+                </TableHead>{/* End ID Solicitud */}
               </TableRow>
             </TableHeader>
             <TableBody className="bg-card divide-y divide-border">
@@ -385,7 +387,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   className={cn({
                     'bg-yellow-50 dark:bg-yellow-800/30 hover:bg-yellow-100 dark:hover:bg-yellow-800/40': solicitud.soporte && !isMarkedAsDuplicate,
                     'bg-red-50 dark:bg-red-800/30 hover:bg-red-100 dark:hover:bg-red-800/40': isMarkedAsDuplicate && !isEffectivelyResolved,
-                    'bg-green-50 dark:bg-green-800/30 hover:bg-green-100 dark:hover:bg-green-800/40': isMarkedAsDuplicate && isEffectivelyResolved, // Now considers permanent resolution
+                    'bg-green-50 dark:bg-green-800/30 hover:bg-green-100 dark:hover:bg-green-800/40': isMarkedAsDuplicate && isEffectivelyResolved,
                     'hover:bg-muted/50': !solicitud.soporte && !isMarkedAsDuplicate,
                   })}
                 >
@@ -709,17 +711,21 @@ export default function DatabasePage() {
 
   const [isExporting, setIsExporting] = useState(false);
 
+  const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
+  const [pendingRecpDocsCount, setPendingRecpDocsCount] = useState(0);
+  const [pendingNotMinutaCount, setPendingNotMinutaCount] = useState(0);
+  const [distinctPendingDocsCount, setDistinctPendingDocsCount] = useState(0);
+
 
   const fetchPermanentlyResolvedKeys = useCallback(async () => {
     if (!user || (user.role !== 'revisor' && user.role !== 'calificador')) {
-      // Only fetch if user is authorized to see or resolve duplicates.
       setIsLoadingPermanentlyResolvedKeys(false);
       return;
     }
     setIsLoadingPermanentlyResolvedKeys(true);
     try {
       const validacionesRef = collection(db, "Validaciones");
-      const q = query(validacionesRef); // Get all documents
+      const q = query(validacionesRef);
       const snapshot = await getDocs(q);
       const keys = snapshot.docs.map(docSnap => docSnap.data().duplicateKey as string);
       setPermanentlyResolvedDuplicateKeys(keys);
@@ -837,6 +843,42 @@ export default function DatabasePage() {
     user?.role,
     user?.email
   ]);
+
+  useEffect(() => {
+    if (displayedSolicitudes && (user?.role === 'calificador' || user?.role === 'revisor')) {
+      let paymentPend = 0;
+      let recpDocsPend = 0;
+      let notMinutaPend = 0;
+
+      displayedSolicitudes.forEach(s => {
+        if (!s.paymentStatus || (s.paymentStatus && !s.paymentStatus.startsWith('Error:') && s.paymentStatus !== 'Pagado')) {
+          paymentPend++;
+        }
+        if (!s.recepcionDCStatus) {
+          recpDocsPend++;
+        }
+        if (!s.emailMinutaStatus) {
+          notMinutaPend++;
+        }
+      });
+      setPendingPaymentCount(paymentPend);
+      setPendingRecpDocsCount(recpDocsPend);
+      setPendingNotMinutaCount(notMinutaPend);
+
+      const distinctPend = displayedSolicitudes.filter(s =>
+          (!s.paymentStatus || (s.paymentStatus && !s.paymentStatus.startsWith('Error:') && s.paymentStatus !== 'Pagado')) ||
+          !s.recepcionDCStatus ||
+          !s.emailMinutaStatus
+      ).length;
+      setDistinctPendingDocsCount(distinctPend);
+
+    } else {
+      setPendingPaymentCount(0);
+      setPendingRecpDocsCount(0);
+      setPendingNotMinutaCount(0);
+      setDistinctPendingDocsCount(0);
+    }
+  }, [displayedSolicitudes, user?.role]);
 
 
   const handleUpdatePaymentStatus = useCallback(async (solicitudId: string, newPaymentStatus: string | null) => {
@@ -1036,10 +1078,9 @@ export default function DatabasePage() {
       toast({ title: "Error", description: "Acción no autorizada.", variant: "destructive" });
       return;
     }
-    // Prevent re-validation if already in Firestore
     if (permanentlyResolvedDuplicateKeys.includes(duplicateKey)) {
         toast({ title: "Información", description: `La alerta para ${duplicateKey.split('-')[0]} ya ha sido resuelta permanentemente.`, variant: "default" });
-        setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); // Ensure it's hidden in session too
+        setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]);
         return;
     }
 
@@ -1059,8 +1100,8 @@ export default function DatabasePage() {
       const validacionesCollectionRef = collection(db, "Validaciones");
       await addDoc(validacionesCollectionRef, validationData);
 
-      setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); // Add to session resolved keys
-      setPermanentlyResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); // Add to permanent resolved keys
+      setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]);
+      setPermanentlyResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]);
       toast({ title: "Alerta de Duplicado Resuelta", description: `La alerta para ${neFromKey} ha sido marcada como "${resolutionStatus === 'validated_not_duplicate' ? 'Validado (No Duplicado)' : 'Solicitud de Eliminación'}".` });
     } catch (err) {
       console.error("Error resolving duplicate: ", err);
@@ -1526,8 +1567,56 @@ export default function DatabasePage() {
               </div>
             </form>
 
+            {displayedSolicitudes && distinctPendingDocsCount > 5 && (
+              (user?.role === 'calificador' && (
+                <Card className="mt-4 mb-6 bg-amber-50 border border-amber-300 custom-shadow">
+                  <CardHeader className="pb-3 pt-4">
+                    <CardTitle className="text-lg text-amber-800 flex items-center">
+                      <AlertTriangle className="h-5 w-5 mr-2 text-amber-600" />
+                      Alerta de Seguimiento
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-amber-700 pb-4">
+                    <p>
+                      Usted cuenta con un total de pendientes para:
+                      ESTADO DE PAGO ({pendingPaymentCount}), RECP. DOCS ({pendingRecpDocsCount}) Y NOT. MINUTA ({pendingNotMinutaCount}).
+                    </p>
+                    {distinctPendingDocsCount > 0 &&
+                      <p className="mt-1">
+                          Total de documentos con estados pendientes: {distinctPendingDocsCount}.
+                      </p>
+                    }
+                    <p className="font-semibold mt-2">Por favor, revisar y calificar estados a las solicitudes pendientes.</p>
+                  </CardContent>
+                </Card>
+              )) ||
+              (user?.role === 'revisor' && (
+                <Card className="mt-4 mb-6 bg-sky-50 border border-sky-300 custom-shadow">
+                  <CardHeader className="pb-3 pt-4">
+                    <CardTitle className="text-lg text-sky-800 flex items-center">
+                      <AlertTriangle className="h-5 w-5 mr-2 text-sky-600" />
+                      Alerta de Seguimiento (Revisores)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-sky-700 pb-4">
+                    <p>
+                      Se identificó que los calificadores cuentan con un total de pendientes para:
+                      ESTADO DE PAGO ({pendingPaymentCount}), RECP. DOCS ({pendingRecpDocsCount}) Y NOT. MINUTA ({pendingNotMinutaCount}).
+                    </p>
+                    {distinctPendingDocsCount > 0 &&
+                      <p className="mt-1">
+                          Con un Total de documentos con estados pendientes: {distinctPendingDocsCount}.
+                      </p>
+                    }
+                    <p className="font-semibold mt-2">Se solicita apoyo a revisores con el seguimiento.</p>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+
             {isLoading && <div className="flex justify-center items-center py-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-3 text-muted-foreground">Cargando solicitudes...</p></div>}
             {error && <div className="mt-4 p-4 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-center">{error}</div>}
+
             {displayedSolicitudes && !isLoading &&
               <SearchResultsTable
                 solicitudes={displayedSolicitudes}
