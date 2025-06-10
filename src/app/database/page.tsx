@@ -115,8 +115,8 @@ interface SearchResultsTableProps {
   duplicateWarning?: string | null;
   duplicateSets: Map<string, string[]>;
   onResolveDuplicate: (key: string, resolution: "validated_not_duplicate" | "deletion_requested") => void;
-  resolvedDuplicateKeys: string[];
-  permanentlyResolvedDuplicateKeys: string[];
+  resolvedDuplicateKeys: string[]; // Keys resolved in current session
+  permanentlyResolvedDuplicateKeys: string[]; // Keys resolved in Firestore
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -165,17 +165,14 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   const { user } = useAuth();
 
   const allDuplicateIdsFromSets = useMemo(() => {
-    if (!solicitudes || solicitudes.length === 0) return [];
     const ids = new Set<string>();
     duplicateSets.forEach(idArray => idArray.forEach(id => ids.add(id)));
     return Array.from(ids);
-  }, [duplicateSets, solicitudes]);
+  }, [duplicateSets]);
 
   const combinedResolvedKeys = useMemo(() => {
-    if (!solicitudes || solicitudes.length === 0) return new Set<string>();
     return new Set([...resolvedDuplicateKeys, ...permanentlyResolvedDuplicateKeys]);
-  }, [resolvedDuplicateKeys, permanentlyResolvedDuplicateKeys, solicitudes]);
-
+  }, [resolvedDuplicateKeys, permanentlyResolvedDuplicateKeys]);
 
   if (!solicitudes || solicitudes.length === 0) {
     let message = "No se encontraron solicitudes para los criterios ingresados.";
@@ -200,7 +197,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
         {duplicateSets.size > 0 && (
           <div className="mt-4 space-y-3">
             {Array.from(duplicateSets.entries()).map(([key, ids]) => {
-              if (combinedResolvedKeys.has(key)) {
+              if (combinedResolvedKeys.has(key)) { 
                 return null;
               }
               const neFromKey = key.split('-')[0];
@@ -239,10 +236,10 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
         )}
       </CardHeader>
       <CardContent>
-        <div className="relative rounded-lg border overflow-y-auto h-[60vh]"> {/* Contenedor de scroll con altura fija */}
+        <div className="overflow-x-auto table-container rounded-lg border">
           <Table>
-            <TableHeader className="sticky top-0 z-30 bg-background">
-              <TableRow className="bg-background">
+            <TableHeader className="bg-secondary/50">
+              <TableRow>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                     <Button variant="ghost" size="icon" onClick={onRefreshSearch} className="h-6 w-6 p-0 mr-1">
                         <RotateCw className="h-4 w-4 text-primary" />
@@ -387,7 +384,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   className={cn({
                     'bg-yellow-50 dark:bg-yellow-800/30 hover:bg-yellow-100 dark:hover:bg-yellow-800/40': solicitud.soporte && !isMarkedAsDuplicate,
                     'bg-red-50 dark:bg-red-800/30 hover:bg-red-100 dark:hover:bg-red-800/40': isMarkedAsDuplicate && !isEffectivelyResolved,
-                    'bg-green-50 dark:bg-green-800/30 hover:bg-green-100 dark:hover:bg-green-800/40': isMarkedAsDuplicate && isEffectivelyResolved,
+                    'bg-green-50 dark:bg-green-800/30 hover:bg-green-100 dark:hover:bg-green-800/40': isMarkedAsDuplicate && isEffectivelyResolved, 
                     'hover:bg-muted/50': !solicitud.soporte && !isMarkedAsDuplicate,
                   })}
                 >
@@ -725,7 +722,7 @@ export default function DatabasePage() {
     setIsLoadingPermanentlyResolvedKeys(true);
     try {
       const validacionesRef = collection(db, "Validaciones");
-      const q = query(validacionesRef);
+      const q = query(validacionesRef); 
       const snapshot = await getDocs(q);
       const keys = snapshot.docs.map(docSnap => docSnap.data().duplicateKey as string);
       setPermanentlyResolvedDuplicateKeys(keys);
@@ -1080,7 +1077,7 @@ export default function DatabasePage() {
     }
     if (permanentlyResolvedDuplicateKeys.includes(duplicateKey)) {
         toast({ title: "Información", description: `La alerta para ${duplicateKey.split('-')[0]} ya ha sido resuelta permanentemente.`, variant: "default" });
-        setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]);
+        setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); 
         return;
     }
 
@@ -1100,8 +1097,8 @@ export default function DatabasePage() {
       const validacionesCollectionRef = collection(db, "Validaciones");
       await addDoc(validacionesCollectionRef, validationData);
 
-      setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]);
-      setPermanentlyResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]);
+      setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); 
+      setPermanentlyResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); 
       toast({ title: "Alerta de Duplicado Resuelta", description: `La alerta para ${neFromKey} ha sido marcada como "${resolutionStatus === 'validated_not_duplicate' ? 'Validado (No Duplicado)' : 'Solicitud de Eliminación'}".` });
     } catch (err) {
       console.error("Error resolving duplicate: ", err);
@@ -1578,7 +1575,7 @@ export default function DatabasePage() {
                   </CardHeader>
                   <CardContent className="text-sm text-amber-700 pb-4">
                     <p>
-                      Usted cuenta con un total de pendientes para:
+                      Usted cuenta con un total de pendientes para: 
                       ESTADO DE PAGO ({pendingPaymentCount}), RECP. DOCS ({pendingRecpDocsCount}) Y NOT. MINUTA ({pendingNotMinutaCount}).
                     </p>
                     {distinctPendingDocsCount > 0 &&
@@ -1600,7 +1597,7 @@ export default function DatabasePage() {
                   </CardHeader>
                   <CardContent className="text-sm text-sky-700 pb-4">
                     <p>
-                      Se identificó que los calificadores cuentan con un total de pendientes para:
+                      Se identificó que los calificadores cuentan con un total de pendientes para: 
                       ESTADO DE PAGO ({pendingPaymentCount}), RECP. DOCS ({pendingRecpDocsCount}) Y NOT. MINUTA ({pendingNotMinutaCount}).
                     </p>
                     {distinctPendingDocsCount > 0 &&
@@ -1616,7 +1613,7 @@ export default function DatabasePage() {
 
             {isLoading && <div className="flex justify-center items-center py-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-3 text-muted-foreground">Cargando solicitudes...</p></div>}
             {error && <div className="mt-4 p-4 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-center">{error}</div>}
-
+            
             {displayedSolicitudes && !isLoading &&
               <SearchResultsTable
                 solicitudes={displayedSolicitudes}
