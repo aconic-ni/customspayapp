@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw } from 'lucide-react';
+import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw, AlertTriangle, ShieldCheck, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer } from 'firebase/firestore';
-import type { SolicitudRecord, CommentRecord } from '@/types';
+import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer, writeBatch } from 'firebase/firestore';
+import type { SolicitudRecord, CommentRecord, ValidacionRecord } from '@/types';
 import { downloadExcelFileFromTable } from '@/lib/fileExporter';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -113,7 +113,10 @@ interface SearchResultsTableProps {
   filterEstadoSolicitudInput: string;
   setFilterEstadoSolicitudInput: (value: string) => void;
   duplicateWarning?: string | null;
-  duplicateSolicitudIds?: string[];
+  duplicateSets: Map<string, string[]>; 
+  onResolveDuplicate: (key: string, resolution: "validated_not_duplicate" | "deletion_requested") => void;
+  resolvedDuplicateKeys: string[]; // Keys resolved in current session
+  permanentlyResolvedDuplicateKeys: string[]; // Keys resolved in Firestore
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -153,7 +156,10 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   filterEstadoSolicitudInput,
   setFilterEstadoSolicitudInput,
   duplicateWarning,
-  duplicateSolicitudIds,
+  duplicateSets,
+  onResolveDuplicate,
+  resolvedDuplicateKeys,
+  permanentlyResolvedDuplicateKeys,
 }) => {
   const { toast } = useToast();
   const { user } = useAuth(); 
@@ -173,14 +179,60 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
     return "Solicitudes Encontradas";
   };
 
+  const allDuplicateIdsFromSets = useMemo(() => {
+    const ids = new Set<string>();
+    duplicateSets.forEach(idArray => idArray.forEach(id => ids.add(id)));
+    return Array.from(ids);
+  }, [duplicateSets]);
+
+  const combinedResolvedKeys = useMemo(() => {
+    return new Set([...resolvedDuplicateKeys, ...permanentlyResolvedDuplicateKeys]);
+  }, [resolvedDuplicateKeys, permanentlyResolvedDuplicateKeys]);
+
+
   return (
     <Card className="mt-6 w-full custom-shadow">
       <CardHeader>
         <CardTitle className="text-xl md:text-2xl font-semibold text-foreground">{getTitle()}</CardTitle>
         <CardDescription className="text-muted-foreground">Se encontraron {solicitudes.length} solicitud(es) asociadas.</CardDescription>
-        {duplicateWarning && (
-          <div className="mt-2 p-3 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md" role="alert">
-            {duplicateWarning}
+        {duplicateSets.size > 0 && (
+          <div className="mt-4 space-y-3">
+            {Array.from(duplicateSets.entries()).map(([key, ids]) => {
+              if (combinedResolvedKeys.has(key)) { // Check against combined list
+                return null; 
+              }
+              const neFromKey = key.split('-')[0];
+              return (
+                <div key={key} className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md" role="alert">
+                  <div className="flex items-center mb-2">
+                    <AlertTriangle className="h-5 w-5 mr-2 text-destructive" />
+                    <p className="font-semibold">Alerta de Duplicado Potencial (NE: {neFromKey})</p>
+                  </div>
+                  <p>Se encontraron múltiples solicitudes con el mismo NE, Monto y Moneda. IDs: {ids.join(', ')}.</p>
+                  <p className="mt-1">Por favor, revise y valide esta situación.</p>
+                  {currentUserRole === 'calificador' && (
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-green-600 text-green-700 hover:bg-green-100 hover:text-green-800"
+                        onClick={() => onResolveDuplicate(key, 'validated_not_duplicate')}
+                      >
+                        <ShieldCheck className="mr-2 h-4 w-4" /> Validado (No Duplicado)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-orange-600 text-orange-700 hover:bg-orange-100 hover:text-orange-800"
+                        onClick={() => onResolveDuplicate(key, 'deletion_requested')}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Solicitar Eliminación
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </CardHeader>
@@ -321,14 +373,20 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
             </TableHeader>
             <TableBody className="bg-card divide-y divide-border">
               {solicitudes.map((solicitud) => {
-                const isDuplicate = !!duplicateSolicitudIds && duplicateSolicitudIds.includes(solicitud.solicitudId);
+                const isMarkedAsDuplicate = allDuplicateIdsFromSets.includes(solicitud.solicitudId);
+                const duplicateKeyForThisRow = `${solicitud.examNe?.trim()}-${solicitud.monto}-${solicitud.montoMoneda?.trim()}`;
+                const isResolvedInSession = resolvedDuplicateKeys.includes(duplicateKeyForThisRow);
+                const isPermanentlyResolved = permanentlyResolvedDuplicateKeys.includes(duplicateKeyForThisRow);
+                const isEffectivelyResolved = isResolvedInSession || isPermanentlyResolved;
+                
                 return (
                 <TableRow 
                   key={solicitud.solicitudId} 
                   className={cn({
-                    'bg-yellow-50 dark:bg-yellow-800/30 hover:bg-yellow-100 dark:hover:bg-yellow-800/40': solicitud.soporte && !isDuplicate,
-                    'bg-red-50 dark:bg-red-800/30 hover:bg-red-100 dark:hover:bg-red-800/40': isDuplicate,
-                    'hover:bg-muted/50': !solicitud.soporte && !isDuplicate,
+                    'bg-yellow-50 dark:bg-yellow-800/30 hover:bg-yellow-100 dark:hover:bg-yellow-800/40': solicitud.soporte && !isMarkedAsDuplicate,
+                    'bg-red-50 dark:bg-red-800/30 hover:bg-red-100 dark:hover:bg-red-800/40': isMarkedAsDuplicate && !isEffectivelyResolved,
+                    'bg-green-50 dark:bg-green-800/30 hover:bg-green-100 dark:hover:bg-green-800/40': isMarkedAsDuplicate && isEffectivelyResolved, // Now considers permanent resolution
+                    'hover:bg-muted/50': !solicitud.soporte && !isMarkedAsDuplicate,
                   })}
                 >
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium">
@@ -614,15 +672,16 @@ export default function DatabasePage() {
   const [isClient, setIsClient] = useState(false);
   const [currentSearchTermForDisplay, setCurrentSearchTermForDisplay] = useState('');
   
-  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
-  const [duplicateSolicitudIds, setDuplicateSolicitudIds] = useState<string[]>([]);
+  const [duplicateSets, setDuplicateSets] = useState<Map<string, string[]>>(new Map());
+  const [resolvedDuplicateKeys, setResolvedDuplicateKeys] = useState<string[]>([]);
+  const [permanentlyResolvedDuplicateKeys, setPermanentlyResolvedDuplicateKeys] = useState<string[]>([]);
+  const [isLoadingPermanentlyResolvedKeys, setIsLoadingPermanentlyResolvedKeys] = useState(true);
 
 
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
   const [currentSolicitudIdForMessage, setCurrentSolicitudIdForMessage] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
 
-  // State for comments dialog
   const [isCommentsDialogOpen, setIsCommentsDialogOpen] = useState(false);
   const [currentSolicitudIdForComments, setCurrentSolicitudIdForComments] = useState<string | null>(null);
   const [comments, setComments] = useState<CommentRecord[]>([]);
@@ -649,6 +708,34 @@ export default function DatabasePage() {
   const [isDetailViewVisible, setIsDetailViewVisible] = useState(false);
 
   const [isExporting, setIsExporting] = useState(false);
+
+
+  const fetchPermanentlyResolvedKeys = useCallback(async () => {
+    if (!user || (user.role !== 'revisor' && user.role !== 'calificador')) {
+      // Only fetch if user is authorized to see or resolve duplicates.
+      setIsLoadingPermanentlyResolvedKeys(false);
+      return;
+    }
+    setIsLoadingPermanentlyResolvedKeys(true);
+    try {
+      const validacionesRef = collection(db, "Validaciones");
+      const q = query(validacionesRef); // Get all documents
+      const snapshot = await getDocs(q);
+      const keys = snapshot.docs.map(docSnap => docSnap.data().duplicateKey as string);
+      setPermanentlyResolvedDuplicateKeys(keys);
+    } catch (err) {
+      console.error("Error fetching permanently resolved keys:", err);
+      toast({ title: "Error", description: "No se pudieron cargar las validaciones previas de duplicados.", variant: "destructive" });
+    } finally {
+      setIsLoadingPermanentlyResolvedKeys(false);
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    if (isClient && !authLoading && user) {
+      fetchPermanentlyResolvedKeys();
+    }
+  }, [isClient, authLoading, user, fetchPermanentlyResolvedKeys]);
 
 
   const handleViewDetailsInline = (solicitud: SolicitudRecord) => {
@@ -707,7 +794,7 @@ export default function DatabasePage() {
         return dateText.toLowerCase().includes(term);
     });
     accumulatedData = applyFilter(accumulatedData, filterNEInput, (s, term) =>
-        s.examNe.toLowerCase().includes(term)
+        (s.examNe || '').toLowerCase().includes(term)
     );
     accumulatedData = applyFilter(accumulatedData, filterMontoInput, (s, term) => {
         const montoText = formatCurrencyFetched(s.monto ?? undefined, s.montoMoneda || undefined);
@@ -868,7 +955,6 @@ export default function DatabasePage() {
     setCurrentSolicitudIdForMessage(null);
   };
 
-  // Comments Dialog functions
   const openCommentsDialog = async (solicitudId: string) => {
     setCurrentSolicitudIdForComments(solicitudId);
     setComments([]); 
@@ -929,7 +1015,6 @@ export default function DatabasePage() {
       setNewCommentText('');
       toast({ title: "Éxito", description: "Comentario publicado." });
 
-      // Optimistically update commentsCount in fetchedSolicitudes
       setFetchedSolicitudes(prevSolicitudes =>
         prevSolicitudes?.map(s =>
           s.solicitudId === currentSolicitudIdForComments
@@ -945,6 +1030,43 @@ export default function DatabasePage() {
       setIsPostingComment(false);
     }
   };
+
+  const handleResolveDuplicate = useCallback(async (duplicateKey: string, resolutionStatus: "validated_not_duplicate" | "deletion_requested") => {
+    if (!user || !user.email || user.role !== 'calificador') {
+      toast({ title: "Error", description: "Acción no autorizada.", variant: "destructive" });
+      return;
+    }
+    // Prevent re-validation if already in Firestore
+    if (permanentlyResolvedDuplicateKeys.includes(duplicateKey)) {
+        toast({ title: "Información", description: `La alerta para ${duplicateKey.split('-')[0]} ya ha sido resuelta permanentemente.`, variant: "default" });
+        setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); // Ensure it's hidden in session too
+        return;
+    }
+
+    const neFromKey = duplicateKey.split('-')[0];
+    const idsInvolved = duplicateSets.get(duplicateKey) || [];
+
+    const validationData: Omit<ValidacionRecord, 'id' | 'resolvedAt'> & { resolvedAt: any } = {
+      resolvedBy: user.email,
+      resolvedAt: serverTimestamp(),
+      duplicateKey,
+      duplicateIds: idsInvolved,
+      resolutionStatus,
+      ne: neFromKey,
+    };
+
+    try {
+      const validacionesCollectionRef = collection(db, "Validaciones");
+      await addDoc(validacionesCollectionRef, validationData);
+      
+      setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); // Add to session resolved keys
+      setPermanentlyResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); // Add to permanent resolved keys
+      toast({ title: "Alerta de Duplicado Resuelta", description: `La alerta para ${neFromKey} ha sido marcada como "${resolutionStatus === 'validated_not_duplicate' ? 'Validado (No Duplicado)' : 'Solicitud de Eliminación'}".` });
+    } catch (err) {
+      console.error("Error resolving duplicate: ", err);
+      toast({ title: "Error", description: "No se pudo resolver la alerta de duplicado.", variant: "destructive" });
+    }
+  }, [user, toast, duplicateSets, permanentlyResolvedDuplicateKeys]);
 
 
   useEffect(() => {
@@ -979,8 +1101,10 @@ export default function DatabasePage() {
     setIsLoading(true);
     setError(null);
     setFetchedSolicitudes(null);
-    setDuplicateWarning(null);
-    setDuplicateSolicitudIds([]);
+    setDuplicateSets(new Map()); 
+    if (!preserveFilters) {
+      setResolvedDuplicateKeys([]); 
+    }
     setCurrentSearchTermForDisplay('');
     setIsDetailViewVisible(false);
     setSolicitudToViewInline(null);
@@ -1149,24 +1273,17 @@ export default function DatabasePage() {
                 potentialDuplicatesMap.get(key)!.push(solicitud.solicitudId);
               }
             });
-
-            const duplicateGroups: string[][] = [];
-            potentialDuplicatesMap.forEach(ids => {
+            
+            const newDuplicateSets = new Map<string, string[]>();
+            potentialDuplicatesMap.forEach((ids, key) => {
               if (ids.length > 1) {
-                duplicateGroups.push(ids);
+                newDuplicateSets.set(key, ids);
               }
             });
+            setDuplicateSets(newDuplicateSets);
 
-            if (duplicateGroups.length > 0) {
-              const allDuplicateIds = duplicateGroups.flat();
-              setDuplicateSolicitudIds(allDuplicateIds);
-              const duplicateIdsText = duplicateGroups.map(group => `(${group.join(', ')})`).join('; ');
-              setDuplicateWarning(`Posible acción duplicada. Revise los siguientes Documentos ID con NE, Monto y Moneda idénticos: ${duplicateIdsText}.`);
-            } else {
-                setDuplicateSolicitudIds([]);
-            }
           } else {
-             setDuplicateSolicitudIds([]);
+             setDuplicateSets(new Map());
           }
 
         } else { setError("No se encontraron solicitudes para los criterios ingresados."); }
@@ -1207,7 +1324,7 @@ export default function DatabasePage() {
 
     const dataToExportPromises = dataToUse.map(async (s) => {
       let commentsString = 'N/A';
-      if (s.commentsCount && s.commentsCount > 0) { // Only fetch if count > 0
+      if (s.commentsCount && s.commentsCount > 0) { 
         try {
             const commentsCollectionRef = collection(db, "SolicitudCheques", s.solicitudId, "comments");
             const q = query(commentsCollectionRef, orderBy("createdAt", "asc"));
@@ -1356,7 +1473,7 @@ export default function DatabasePage() {
     }
   };
 
-  if (!isClient || (authLoading && !fetchedSolicitudes && !isDetailViewVisible)) {
+  if (!isClient || ((authLoading || isLoadingPermanentlyResolvedKeys) && !fetchedSolicitudes && !isDetailViewVisible)) {
     return <div className="min-h-screen flex items-center justify-center grid-bg"><Loader2 className="h-12 w-12 animate-spin text-white" /></div>;
   }
 
@@ -1389,7 +1506,7 @@ export default function DatabasePage() {
           <CardContent>
             <form onSubmit={(e) => handleSearch({ event: e })} className="space-y-4 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Select value={searchType} onValueChange={(value) => { setSearchType(value as SearchType); setSearchTermText(''); setSelectedDate(undefined); setDatePickerStartDate(undefined); setDatePickerEndDate(undefined); setFetchedSolicitudes(null); setError(null); setDuplicateWarning(null); setDuplicateSolicitudIds([]); setCurrentSearchTermForDisplay(''); }}>
+              <Select value={searchType} onValueChange={(value) => { setSearchType(value as SearchType); setSearchTermText(''); setSelectedDate(undefined); setDatePickerStartDate(undefined); setDatePickerEndDate(undefined); setFetchedSolicitudes(null); setError(null); setDuplicateSets(new Map()); setResolvedDuplicateKeys([]); setCurrentSearchTermForDisplay(''); }}>
                   <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue placeholder="Tipo de búsqueda" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
@@ -1401,8 +1518,8 @@ export default function DatabasePage() {
                 {renderSearchInputs()}
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-3">
-                <Button type="submit" className="btn-primary w-full sm:w-auto" disabled={isLoading}><Search className="mr-2 h-4 w-4" /> {isLoading ? 'Buscando...' : 'Ejecutar Búsqueda'}</Button>
-                <Button type="button" onClick={handleExport} variant="outline" className="w-full sm:w-auto" disabled={!displayedSolicitudes || isLoading || (displayedSolicitudes && displayedSolicitudes.length === 0) || isExporting}>
+                <Button type="submit" className="btn-primary w-full sm:w-auto" disabled={isLoading || isLoadingPermanentlyResolvedKeys}><Search className="mr-2 h-4 w-4" /> {isLoading ? 'Buscando...' : 'Ejecutar Búsqueda'}</Button>
+                <Button type="button" onClick={handleExport} variant="outline" className="w-full sm:w-auto" disabled={!displayedSolicitudes || isLoading || isLoadingPermanentlyResolvedKeys || (displayedSolicitudes && displayedSolicitudes.length === 0) || isExporting}>
                     {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isExporting ? 'Exportando...' : 'Exportar Tabla'}
                 </Button>
@@ -1448,8 +1565,10 @@ export default function DatabasePage() {
                 setFilterGuardadoPorInput={setFilterGuardadoPorInput}
                 filterEstadoSolicitudInput={filterEstadoSolicitudInput}
                 setFilterEstadoSolicitudInput={setFilterEstadoSolicitudInput}
-                duplicateWarning={duplicateWarning}
-                duplicateSolicitudIds={duplicateSolicitudIds}
+                duplicateSets={duplicateSets}
+                onResolveDuplicate={handleResolveDuplicate}
+                resolvedDuplicateKeys={resolvedDuplicateKeys}
+                permanentlyResolvedDuplicateKeys={permanentlyResolvedDuplicateKeys}
               />
             }
             {!fetchedSolicitudes && !isLoading && !error && !currentSearchTermForDisplay && <div className="mt-4 p-4 bg-blue-500/10 text-blue-700 border border-blue-500/30 rounded-md text-center">Seleccione un tipo de búsqueda e ingrese los criterios para ver resultados.</div>}
