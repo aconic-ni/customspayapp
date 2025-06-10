@@ -1,3 +1,4 @@
+
 import type { Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 
 // Represents the data collected in the initial form, held in AppContext
@@ -150,4 +151,15 @@ export interface ExportableSolicitudContextData extends Omit<InitialDataContext,
   solicitudes?: SolicitudData[] | null;
   savedAt?: Date | FirestoreTimestamp | null;
   savedBy?: string | null;
+}
+
+// New type for Validaciones collection
+export interface ValidacionRecord {
+  id?: string; // Firestore document ID, optional as it's auto-generated on write
+  resolvedBy: string;
+  resolvedAt: Date; // JS Date for client, Firestore Timestamp in DB
+  duplicateKey: string; // e.g., "NE-monto-moneda"
+  duplicateIds: string[];
+  resolutionStatus: "validated_not_duplicate" | "deletion_requested";
+  ne: string; // To help with querying/displaying
 }
