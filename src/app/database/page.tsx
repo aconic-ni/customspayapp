@@ -113,7 +113,7 @@ interface SearchResultsTableProps {
   filterEstadoSolicitudInput: string;
   setFilterEstadoSolicitudInput: (value: string) => void;
   duplicateWarning?: string | null;
-  duplicateSets: Map<string, string[]>; 
+  duplicateSets: Map<string, string[]>;
   onResolveDuplicate: (key: string, resolution: "validated_not_duplicate" | "deletion_requested") => void;
   resolvedDuplicateKeys: string[]; // Keys resolved in current session
   permanentlyResolvedDuplicateKeys: string[]; // Keys resolved in Firestore
@@ -162,7 +162,18 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   permanentlyResolvedDuplicateKeys,
 }) => {
   const { toast } = useToast();
-  const { user } = useAuth(); 
+  const { user } = useAuth();
+
+  // Moved useMemo hooks to the top
+  const allDuplicateIdsFromSets = useMemo(() => {
+    const ids = new Set<string>();
+    duplicateSets.forEach(idArray => idArray.forEach(id => ids.add(id)));
+    return Array.from(ids);
+  }, [duplicateSets]);
+
+  const combinedResolvedKeys = useMemo(() => {
+    return new Set([...resolvedDuplicateKeys, ...permanentlyResolvedDuplicateKeys]);
+  }, [resolvedDuplicateKeys, permanentlyResolvedDuplicateKeys]);
 
   if (!solicitudes || solicitudes.length === 0) {
     let message = "No se encontraron solicitudes para los criterios ingresados.";
@@ -179,17 +190,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
     return "Solicitudes Encontradas";
   };
 
-  const allDuplicateIdsFromSets = useMemo(() => {
-    const ids = new Set<string>();
-    duplicateSets.forEach(idArray => idArray.forEach(id => ids.add(id)));
-    return Array.from(ids);
-  }, [duplicateSets]);
-
-  const combinedResolvedKeys = useMemo(() => {
-    return new Set([...resolvedDuplicateKeys, ...permanentlyResolvedDuplicateKeys]);
-  }, [resolvedDuplicateKeys, permanentlyResolvedDuplicateKeys]);
-
-
   return (
     <Card className="mt-6 w-full custom-shadow">
       <CardHeader>
@@ -199,7 +199,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
           <div className="mt-4 space-y-3">
             {Array.from(duplicateSets.entries()).map(([key, ids]) => {
               if (combinedResolvedKeys.has(key)) { // Check against combined list
-                return null; 
+                return null;
               }
               const neFromKey = key.split('-')[0];
               return (
@@ -378,10 +378,10 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                 const isResolvedInSession = resolvedDuplicateKeys.includes(duplicateKeyForThisRow);
                 const isPermanentlyResolved = permanentlyResolvedDuplicateKeys.includes(duplicateKeyForThisRow);
                 const isEffectivelyResolved = isResolvedInSession || isPermanentlyResolved;
-                
+
                 return (
-                <TableRow 
-                  key={solicitud.solicitudId} 
+                <TableRow
+                  key={solicitud.solicitudId}
                   className={cn({
                     'bg-yellow-50 dark:bg-yellow-800/30 hover:bg-yellow-100 dark:hover:bg-yellow-800/40': solicitud.soporte && !isMarkedAsDuplicate,
                     'bg-red-50 dark:bg-red-800/30 hover:bg-red-100 dark:hover:bg-red-800/40': isMarkedAsDuplicate && !isEffectivelyResolved,
@@ -660,7 +660,7 @@ export default function DatabasePage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [datePickerStartDate, setDatePickerStartDate] = useState<Date | undefined>(undefined);
   const [datePickerEndDate, setDatePickerEndDate] = useState<Date | undefined>(undefined);
-  
+
   const [isSpecificDatePopoverOpen, setIsSpecificDatePopoverOpen] = useState(false);
   const [isStartDatePopoverOpen, setIsStartDatePopoverOpen] = useState(false);
   const [isEndDatePopoverOpen, setIsEndDatePopoverOpen] = useState(false);
@@ -671,7 +671,7 @@ export default function DatabasePage() {
   const [fetchedSolicitudes, setFetchedSolicitudes] = useState<SolicitudRecord[] | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [currentSearchTermForDisplay, setCurrentSearchTermForDisplay] = useState('');
-  
+
   const [duplicateSets, setDuplicateSets] = useState<Map<string, string[]>>(new Map());
   const [resolvedDuplicateKeys, setResolvedDuplicateKeys] = useState<string[]>([]);
   const [permanentlyResolvedDuplicateKeys, setPermanentlyResolvedDuplicateKeys] = useState<string[]>([]);
@@ -761,7 +761,7 @@ export default function DatabasePage() {
         if (!filterValue.trim()) return data;
         const searchTerm = filterValue.toLowerCase().trim();
         const filtered = data.filter(item => filterFn(item, searchTerm));
-        return filtered.length > 0 || data.length === 0 ? filtered : data; 
+        return filtered.length > 0 || data.length === 0 ? filtered : data;
     };
 
     accumulatedData = applyFilter(accumulatedData, filterEstadoSolicitudInput, (s, term) => {
@@ -856,8 +856,8 @@ export default function DatabasePage() {
         prev?.map(s =>
           s.solicitudId === solicitudId
             ? { ...s,
-                paymentStatus: newPaymentStatus === null ? null : newPaymentStatus, 
-                paymentStatusLastUpdatedAt: new Date(), 
+                paymentStatus: newPaymentStatus === null ? null : newPaymentStatus,
+                paymentStatusLastUpdatedAt: new Date(),
                 paymentStatusLastUpdatedBy: user.email!
               }
             : s
@@ -957,7 +957,7 @@ export default function DatabasePage() {
 
   const openCommentsDialog = async (solicitudId: string) => {
     setCurrentSolicitudIdForComments(solicitudId);
-    setComments([]); 
+    setComments([]);
     setIsLoadingComments(true);
     setIsCommentsDialogOpen(true);
 
@@ -1002,7 +1002,7 @@ export default function DatabasePage() {
     setIsPostingComment(true);
     try {
       const commentsCollectionRef = collection(db, "SolicitudCheques", currentSolicitudIdForComments, "comments");
-      const newCommentData: Omit<CommentRecord, 'id' | 'createdAt'> & { createdAt: any } = { 
+      const newCommentData: Omit<CommentRecord, 'id' | 'createdAt'> & { createdAt: any } = {
         solicitudId: currentSolicitudIdForComments,
         text: newCommentText.trim(),
         userId: user.uid,
@@ -1010,7 +1010,7 @@ export default function DatabasePage() {
         createdAt: serverTimestamp(),
       };
       const docRef = await addDoc(commentsCollectionRef, newCommentData);
-      
+
       setComments(prev => [...prev, { ...newCommentData, id: docRef.id, createdAt: new Date() } as CommentRecord]);
       setNewCommentText('');
       toast({ title: "Éxito", description: "Comentario publicado." });
@@ -1058,7 +1058,7 @@ export default function DatabasePage() {
     try {
       const validacionesCollectionRef = collection(db, "Validaciones");
       await addDoc(validacionesCollectionRef, validationData);
-      
+
       setResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); // Add to session resolved keys
       setPermanentlyResolvedDuplicateKeys(prev => [...new Set([...prev, duplicateKey])]); // Add to permanent resolved keys
       toast({ title: "Alerta de Duplicado Resuelta", description: `La alerta para ${neFromKey} ha sido marcada como "${resolutionStatus === 'validated_not_duplicate' ? 'Validado (No Duplicado)' : 'Solicitud de Eliminación'}".` });
@@ -1076,8 +1076,8 @@ export default function DatabasePage() {
   useEffect(() => {
     if (isClient && !authLoading) {
       const isAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
-      if (!isAuthorized && !isDetailViewVisible) { 
-        if (!fetchedSolicitudes) { 
+      if (!isAuthorized && !isDetailViewVisible) {
+        if (!fetchedSolicitudes) {
           router.push('/');
         }
       }
@@ -1101,9 +1101,9 @@ export default function DatabasePage() {
     setIsLoading(true);
     setError(null);
     setFetchedSolicitudes(null);
-    setDuplicateSets(new Map()); 
+    setDuplicateSets(new Map());
     if (!preserveFilters) {
-      setResolvedDuplicateKeys([]); 
+      setResolvedDuplicateKeys([]);
     }
     setCurrentSearchTermForDisplay('');
     setIsDetailViewVisible(false);
@@ -1192,7 +1192,7 @@ export default function DatabasePage() {
             const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
             const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
             const emailMinutaLastUpdatedAt = docData.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? docData.emailMinutaLastUpdatedAt.toDate() : (docData.emailMinutaLastUpdatedAt instanceof Date ? docData.emailMinutaLastUpdatedAt : undefined);
-            
+
             let commentsCount = 0;
             try {
               const commentsColRef = collection(db, "SolicitudCheques", docSnap.id, "comments");
@@ -1216,7 +1216,7 @@ export default function DatabasePage() {
               emailMinutaStatus: docData.emailMinutaStatus ?? false,
               emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
               emailMinutaLastUpdatedBy: docData.emailMinutaLastUpdatedBy || null,
-              examNe: docData.examNe || '', 
+              examNe: docData.examNe || '',
               examReference: docData.examReference || null,
               examManager: docData.examManager || '',
               examRecipient: docData.examRecipient || '',
@@ -1264,7 +1264,7 @@ export default function DatabasePage() {
             const potentialDuplicatesMap = new Map<string, string[]>();
             data.forEach(solicitud => {
               if (solicitud.examNe && solicitud.examNe.trim() !== '' &&
-                  solicitud.monto !== null && 
+                  solicitud.monto !== null &&
                   solicitud.montoMoneda && solicitud.montoMoneda.trim() !== '') {
                 const key = `${solicitud.examNe.trim()}-${solicitud.monto}-${solicitud.montoMoneda.trim()}`;
                 if (!potentialDuplicatesMap.has(key)) {
@@ -1273,7 +1273,7 @@ export default function DatabasePage() {
                 potentialDuplicatesMap.get(key)!.push(solicitud.solicitudId);
               }
             });
-            
+
             const newDuplicateSets = new Map<string, string[]>();
             potentialDuplicatesMap.forEach((ids, key) => {
               if (ids.length > 1) {
@@ -1318,13 +1318,13 @@ export default function DatabasePage() {
       "Impuestos Pendientes Cliente", "Soporte", "Documentos Adjuntos",
       "Constancias de No Retención", "Constancia 1%", "Constancia 2%",
       "Pago de Servicios", "Tipo de Servicio", "Otro Tipo de Servicio", "Factura Servicio", "Institución Servicio",
-      "Correo Notificación", "Observación", "Usuario (De)", 
+      "Correo Notificación", "Observación", "Usuario (De)",
       "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)", "Comentarios"
     ];
 
     const dataToExportPromises = dataToUse.map(async (s) => {
       let commentsString = 'N/A';
-      if (s.commentsCount && s.commentsCount > 0) { 
+      if (s.commentsCount && s.commentsCount > 0) {
         try {
             const commentsCollectionRef = collection(db, "SolicitudCheques", s.solicitudId, "comments");
             const q = query(commentsCollectionRef, orderBy("createdAt", "asc"));
@@ -1334,7 +1334,7 @@ export default function DatabasePage() {
                 const data = docSnap.data();
                 const createdAt = data.createdAt instanceof FirestoreTimestamp ? data.createdAt.toDate() : new Date();
                 return `${data.userEmail} - ${format(createdAt, "dd/MM/yy HH:mm", { locale: es })}: ${data.text}`;
-            }).join("\n"); 
+            }).join("\n");
             }
         } catch (err) {
             console.error(`Error fetching comments for ${s.solicitudId}: `, err);
@@ -1387,7 +1387,7 @@ export default function DatabasePage() {
         "Constancia 2%": s.constanciasNoRetencion ? (s.constanciasNoRetencion2 ? 'Sí' : 'No') : 'N/A',
         "Pago de Servicios": s.pagoServicios ? 'Sí' : 'No',
         "Tipo de Servicio": s.pagoServicios ? (s.tipoServicio === 'OTROS' ? s.otrosTipoServicio : s.tipoServicio) || 'N/A' : 'N/A',
-        "Otro Tipo de Servicio": s.pagoServicios && s.tipoServicio === 'OTROS' ? s.otrosTipoServicio || 'N/A' : 'N/A', 
+        "Otro Tipo de Servicio": s.pagoServicios && s.tipoServicio === 'OTROS' ? s.otrosTipoServicio || 'N/A' : 'N/A',
         "Factura Servicio": s.pagoServicios ? s.facturaServicio || 'N/A' : 'N/A',
         "Institución Servicio": s.pagoServicios ? s.institucionServicio || 'N/A' : 'N/A',
         "Correo Notificación": s.correo || 'N/A',
@@ -1604,7 +1604,7 @@ export default function DatabasePage() {
 
       {/* Comments Dialog */}
       <Dialog open={isCommentsDialogOpen} onOpenChange={closeCommentsDialog}>
-        <DialogContent className="sm:max-w-2xl"> 
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Comentarios para Solicitud ID: {currentSolicitudIdForComments}</DialogTitle>
             <DialogDescription>
@@ -1622,14 +1622,14 @@ export default function DatabasePage() {
                 <p className="text-sm text-muted-foreground text-center py-4">No hay comentarios aún.</p>
               ) : (
                 comments.map(comment => (
-                  <div key={comment.id} className="p-2 my-1 border-b bg-card shadow-sm rounded"> 
+                  <div key={comment.id} className="p-2 my-1 border-b bg-card shadow-sm rounded">
                     <div className="flex justify-between items-center mb-1">
-                        <p className="font-semibold text-primary text-xs">{comment.userEmail}</p> 
-                        <p className="text-muted-foreground text-xs"> 
+                        <p className="font-semibold text-primary text-xs">{comment.userEmail}</p>
+                        <p className="text-muted-foreground text-xs">
                             {format(comment.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}
                         </p>
                     </div>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{comment.text}</p> 
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{comment.text}</p>
                   </div>
                 ))
               )}
