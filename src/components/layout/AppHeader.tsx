@@ -2,7 +2,7 @@
 "use client";
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { FileText, LogOut, UserCircle, Database, Coins } from 'lucide-react'; // Changed Share2 to Coins
+import { FileText, LogOut, UserCircle, Database, Coins, CheckSquare } from 'lucide-react'; // Added CheckSquare
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,8 @@ export function AppHeader() {
   const { toast } = useToast();
 
   const isDatabaseAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
+  const isValidacionesAuthorized = user && (user.role === 'revisor' || user.role === 'calificador');
+
 
   const renderAppIdentity = () => (
     <>
@@ -28,6 +30,18 @@ export function AppHeader() {
       toast({
         title: "Acceso Denegado",
         description: "Usuario no autorizado para acceder a la base de datos.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleValidacionesNavigation = () => {
+    if (isValidacionesAuthorized) {
+      router.push('/validaciones');
+    } else {
+      toast({
+        title: "Acceso Denegado",
+        description: "Usuario no autorizado para acceder a las validaciones.",
         variant: "destructive",
       });
     }
@@ -50,7 +64,7 @@ export function AppHeader() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3"> {/* Adjusted gap for more buttons */}
             {loading ? (
               <div className="text-sm text-muted-foreground">Cargando...</div>
             ) : user ? (
@@ -77,6 +91,17 @@ export function AppHeader() {
                 >
                   <Database className="h-5 w-5" />
                 </Button>
+                {isValidacionesAuthorized && (
+                   <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleValidacionesNavigation}
+                      className="text-primary hover:bg-teal-500 hover:text-white"
+                      aria-label="Ir a Validaciones de Duplicados"
+                    >
+                      <CheckSquare className="h-5 w-5" />
+                   </Button>
+                )}
                 <Button
                   asChild
                   variant="ghost"
