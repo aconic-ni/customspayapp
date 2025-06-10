@@ -34,11 +34,11 @@ interface ValidacionesTableProps {
   onRefresh: () => void;
 }
 
-const ValidacionesTable: React.FC<ValidacionesTableProps> = ({ 
-  validaciones, 
-  filterNeInput, 
-  setFilterNeInput, 
-  filterResolvedByInput, 
+const ValidacionesTable: React.FC<ValidacionesTableProps> = ({
+  validaciones,
+  filterNeInput,
+  setFilterNeInput,
+  filterResolvedByInput,
   setFilterResolvedByInput,
   onRefresh
 }) => {
@@ -163,22 +163,6 @@ export default function ValidacionesPage() {
     setIsClient(true);
   }, []);
 
-  useEffect(() => {
-    if (isClient && !authLoading) {
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-      if (user.role === 'autorevisor') {
-        setError("No tiene permisos para acceder a esta sección.");
-        setFetchedValidaciones([]); 
-        return;
-      }
-      // Automatically fetch all on load if authorized
-      handleFetchValidaciones();
-    }
-  }, [user, authLoading, router, isClient]);
-
   const handleFetchValidaciones = useCallback(async (event?: FormEvent) => {
     if (event) event.preventDefault();
     if (user?.role === 'autorevisor') {
@@ -220,6 +204,22 @@ export default function ValidacionesPage() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (isClient && !authLoading) {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      if (user.role === 'autorevisor') {
+        setError("No tiene permisos para acceder a esta sección.");
+        setFetchedValidaciones([]);
+        return;
+      }
+      // Automatically fetch all on load if authorized
+      handleFetchValidaciones();
+    }
+  }, [user, authLoading, router, isClient, handleFetchValidaciones]);
+
   const displayedValidaciones = useMemo(() => {
     if (!fetchedValidaciones) return null;
     let filteredData = [...fetchedValidaciones];
@@ -234,7 +234,7 @@ export default function ValidacionesPage() {
     }
      if (searchTerm.trim()) {
       const globalTerm = searchTerm.toLowerCase().trim();
-      filteredData = filteredData.filter(v => 
+      filteredData = filteredData.filter(v =>
         (v.id?.toLowerCase().includes(globalTerm)) ||
         (v.ne || v.duplicateKey.split('-')[0]).toLowerCase().includes(globalTerm) ||
         (v.resolvedBy.toLowerCase().includes(globalTerm)) ||
@@ -249,7 +249,7 @@ export default function ValidacionesPage() {
   if (!isClient || authLoading) {
     return <div className="min-h-screen flex items-center justify-center grid-bg"><Loader2 className="h-12 w-12 animate-spin text-white" /></div>;
   }
-  
+
   if (user?.role === 'autorevisor') {
     return (
       <AppShell>
@@ -281,7 +281,7 @@ export default function ValidacionesPage() {
           <CardContent>
              <form onSubmit={(e) => handleFetchValidaciones(e)} className="space-y-4 mb-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <Input 
+                    <Input
                         type="text"
                         placeholder="Búsqueda general en validaciones..."
                         value={searchTerm}
@@ -295,7 +295,7 @@ export default function ValidacionesPage() {
             </form>
             {isLoading && <div className="flex justify-center items-center py-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-3 text-muted-foreground">Cargando validaciones...</p></div>}
             {error && !isLoading && <div className="mt-4 p-4 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-center">{error}</div>}
-            
+
             {displayedValidaciones && !isLoading && (
               <ValidacionesTable
                 validaciones={displayedValidaciones}
