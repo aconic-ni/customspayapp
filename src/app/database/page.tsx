@@ -161,7 +161,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   resolvedDuplicateKeys,
   permanentlyResolvedDuplicateKeys,
 }) => {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { user } = useAuth();
 
   const allDuplicateIdsFromSets = useMemo(() => {
@@ -239,17 +239,17 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
         )}
       </CardHeader>
       <CardContent>
-        <div className="rounded-lg border"> 
+        <div className="relative rounded-lg border overflow-y-auto h-[60vh]"> {/* Contenedor de scroll con altura fija */}
           <Table>
-            <TableHeader className="sticky top-0 z-30 bg-background">{/* THEAD is sticky */}
-              <TableRow>{/* TR inside THEAD */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Acciones */}
+            <TableHeader className="sticky top-0 z-30 bg-background">
+              <TableRow className="bg-background">
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                     <Button variant="ghost" size="icon" onClick={onRefreshSearch} className="h-6 w-6 p-0 mr-1">
                         <RotateCw className="h-4 w-4 text-primary" />
                     </Button>
                     Acciones
-                </TableHead>{/* End Acciones */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Estado de Pago */}
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado de Pago
                   <Input
                     type="text"
@@ -258,8 +258,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterEstadoPagoInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End Estado de Pago */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start RECP. DOCS */}
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   RECP. DOCS
                   <Input
                     type="text"
@@ -268,8 +268,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterRecpDocsInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End RECP. DOCS */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start NOT. MINUTA */}
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   NOT. MINUTA
                   <Input
                     type="text"
@@ -278,8 +278,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterNotMinutaInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End NOT. MINUTA */}
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Estado Solicitud */}
+                </TableHead>
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado Solicitud
                   <Input
                     type="text"
@@ -288,8 +288,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterEstadoSolicitudInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End Estado Solicitud */}
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Consignatario */}
+                </TableHead>
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Consignatario
                   <Input
                     type="text"
@@ -298,8 +298,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterConsignatarioInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End Consignatario */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Declaracion */}
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Declaracion
                   <Input
                     type="text"
@@ -308,8 +308,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterDeclaracionInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End Declaracion */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Fecha */}
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Fecha
                   <Input
                     type="text"
@@ -318,8 +318,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterFechaSolicitudInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End Fecha */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start NE */}
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   NE
                   <Input
                     type="text"
@@ -328,8 +328,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterNEInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End NE */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Monto */}
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Monto
                   <Input
                     type="text"
@@ -338,8 +338,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterMontoInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End Monto */}
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Referencia */}
+                </TableHead>
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Referencia
                   <Input
                     type="text"
@@ -348,8 +348,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterReferenciaInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End Referencia */}
-                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start Guardado Por */}
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Guardado Por
                   <Input
                     type="text"
@@ -360,8 +360,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     disabled={currentUserRole === 'autorevisor'}
                     readOnly={currentUserRole === 'autorevisor'}
                   />
-                </TableHead>{/* End Guardado Por */}
-                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{/* Start ID Solicitud */}
+                </TableHead>
+                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   ID Solicitud
                   <Input
                     type="text"
@@ -370,7 +370,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     onChange={(e) => setFilterSolicitudIdInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
-                </TableHead>{/* End ID Solicitud */}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="bg-card divide-y divide-border">
