@@ -180,8 +180,8 @@ export function SuccessModal() {
   };
 
   const handleGoToDatabase = () => {
-    const isDatabaseAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
-    if (isDatabaseAuthorized) {
+    const authorizedRolesForDatabase = ['revisor', 'calificador', 'admin', 'autorevisor_plus'];
+    if (user && user.role && authorizedRolesForDatabase.includes(user.role)) {
       router.push('/database');
     } else {
       toast({
