@@ -23,7 +23,7 @@ export default function LoginPage() {
       let targetPath = '/examiner'; // Default
       if (user.role === 'autorevisor') {
         targetPath = '/examiner';
-      } else if (user.role === 'revisor' || user.role === 'calificador') { // Eliminada la condición user.isStaticUser
+      } else if (user.role === 'revisor' || user.role === 'calificador' || user.role === 'admin' || user.role === 'autorevisor_plus') { 
         targetPath = '/database';
       }
       if (pathname !== targetPath) {
