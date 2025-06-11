@@ -12,7 +12,6 @@ interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
   logout: () => Promise<void>;
-  // setStaticUser: (user: AppUser | null) => void; // Eliminado
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,12 +32,19 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     const unsubscribe = onAuthStateChanged(auth as Auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         let userRole: string | undefined = undefined;
+        let originalRoleFromDb: string | undefined = undefined;
+        let canReviewUserEmail: string | undefined = undefined; // For autorevisor_plus
         try {
           const userRoleDocRef = doc(db, "userRoles", firebaseUser.uid);
           const userRoleSnap = await getDoc(userRoleDocRef);
           if (userRoleSnap.exists()) {
-            userRole = userRoleSnap.data()?.role as string | undefined;
-            console.log(`Role for ${firebaseUser.email}: ${userRole}`);
+            const roleData = userRoleSnap.data();
+            originalRoleFromDb = roleData?.role as string | undefined;
+            if (originalRoleFromDb) {
+              userRole = originalRoleFromDb.trim().toLowerCase(); // Normalize role
+            }
+            canReviewUserEmail = roleData?.canReviewUserEmail as string | undefined; // Fetch colleague's email
+            console.log(`Role for ${firebaseUser.email}: ${userRole} (Original from DB: "${originalRoleFromDb}"), Can Review: ${canReviewUserEmail || 'N/A'}`);
           } else {
             console.log(`No role document found for ${firebaseUser.email}`);
           }
@@ -50,27 +56,27 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          // isStaticUser: false, // Eliminado
           role: userRole,
+          canReviewUserEmail: canReviewUserEmail, // Store it in the user object
         });
       } else {
-        setUser(null); // Si no hay usuario de Firebase, el usuario es null
+        setUser(null); 
       }
       setLoading(false); 
     });
 
     return () => unsubscribe();
-  }, [isFirebaseInitialized]); // Dependencias simplificadas
+  }, [isFirebaseInitialized]);
 
   const logout = async () => {
     setLoading(true);
     try {
       await firebaseSignOut(auth as Auth);
-      setUser(null); // Aseguramos que el usuario se limpie localmente también
+      setUser(null); 
     } catch (error) {
       console.error("Error signing out: ", error);
     } finally {
-      setLoading(false); // Se establece loading a false independientemente del resultado
+      setLoading(false); 
     }
   };
   
