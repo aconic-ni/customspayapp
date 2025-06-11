@@ -12,8 +12,8 @@ export function AppHeader() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const isDatabaseAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
-  const isValidacionesAuthorized = user && (user.role === 'revisor' || user.role === 'calificador');
+  const isDatabaseAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor' || user.role === 'admin' || user.role === 'autorevisor_plus');
+  const isValidacionesAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'admin'); // autorevisor_plus typically shouldn't access this
 
 
   const renderAppIdentity = () => (
