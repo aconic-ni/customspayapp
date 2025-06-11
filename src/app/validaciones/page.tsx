@@ -165,7 +165,8 @@ export default function ValidacionesPage() {
 
   const handleFetchValidaciones = useCallback(async (event?: FormEvent) => {
     if (event) event.preventDefault();
-    if (user?.role === 'autorevisor') {
+    const currentRole = user?.role;
+    if (currentRole === 'autorevisor' || currentRole === 'autorevisor_plus') {
         setError("No tiene permisos para acceder a esta sección.");
         setFetchedValidaciones([]);
         return;
@@ -176,8 +177,6 @@ export default function ValidacionesPage() {
     setFetchedValidaciones(null);
 
     const validacionesCollectionRef = collection(db, "Validaciones");
-    // For now, we fetch all and filter client-side.
-    // If performance becomes an issue, specific queries for NE or resolvedBy can be added.
     const q = query(validacionesCollectionRef, orderBy("resolvedAt", "desc"));
 
     try {
@@ -193,7 +192,7 @@ export default function ValidacionesPage() {
         });
         setFetchedValidaciones(data);
       } else {
-        setFetchedValidaciones([]); // Set to empty array if no results
+        setFetchedValidaciones([]); 
       }
     } catch (err: any) {
       console.error("Error fetching validaciones: ", err);
@@ -210,13 +209,14 @@ export default function ValidacionesPage() {
         router.push('/login');
         return;
       }
-      if (user.role === 'autorevisor') {
+      // Roles allowed to see this page
+      const allowedRoles = ['revisor', 'calificador', 'admin'];
+      if (user.role && allowedRoles.includes(user.role)) {
+        handleFetchValidaciones();
+      } else {
         setError("No tiene permisos para acceder a esta sección.");
         setFetchedValidaciones([]);
-        return;
       }
-      // Automatically fetch all on load if authorized
-      handleFetchValidaciones();
     }
   }, [user, authLoading, router, isClient, handleFetchValidaciones]);
 
@@ -250,7 +250,8 @@ export default function ValidacionesPage() {
     return <div className="min-h-screen flex items-center justify-center grid-bg"><Loader2 className="h-12 w-12 animate-spin text-white" /></div>;
   }
 
-  if (user?.role === 'autorevisor') {
+  const isUnauthorized = user?.role === 'autorevisor' || user?.role === 'autorevisor_plus' || (!user?.role && !authLoading);
+  if (isUnauthorized) { 
     return (
       <AppShell>
         <div className="py-2 md:py-5">
