@@ -61,7 +61,8 @@ export interface AppUser {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  role?: 'revisor' | 'calificador' | 'autorevisor' | string;
+  role?: 'revisor' | 'calificador' | 'autorevisor' | 'admin' | 'autorevisor_plus' | string; // Added 'admin' and 'autorevisor_plus'
+  canReviewUserEmail?: string; // For autorevisor_plus
 }
 
 // Represents the structure of each document in the "SolicitudCheques" collection
