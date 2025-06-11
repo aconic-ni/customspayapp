@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw, AlertTriangle, ShieldCheck, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer, writeBatch, deleteDoc, type QueryConstraint } from 'firebase/firestore';
 import type { SolicitudRecord, CommentRecord, ValidacionRecord } from '@/types';
 import { downloadExcelFileFromTable } from '@/lib/fileExporter';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
@@ -38,7 +38,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -87,6 +87,7 @@ interface SearchResultsTableProps {
   onOpenMessageDialog: (solicitudId: string) => void;
   onViewDetails: (solicitud: SolicitudRecord) => void;
   onOpenCommentsDialog: (solicitudId: string) => void;
+  onDeleteSolicitud: (solicitudId: string) => void; // New prop
   onRefreshSearch: () => void;
   filterRecpDocsInput: string;
   setFilterRecpDocsInput: (value: string) => void;
@@ -130,6 +131,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   onOpenMessageDialog,
   onViewDetails,
   onOpenCommentsDialog,
+  onDeleteSolicitud, // Destructure new prop
   onRefreshSearch,
   filterRecpDocsInput,
   setFilterRecpDocsInput,
@@ -177,17 +179,19 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   if (!solicitudes || solicitudes.length === 0) {
     let message = "No se encontraron solicitudes para los criterios ingresados.";
     if (searchType === "dateToday") message = "No se encontraron solicitudes para hoy."
-    else if (searchType === "dateCurrentMonth") message = `No se encontraron solicitudes para ${searchTerm}.`
+    // else if (searchType === "dateCurrentMonth") message = `No se encontraron solicitudes para ${searchTerm}.` // Temporarily commented
     return <p className="text-muted-foreground text-center py-4">{message}</p>;
   }
 
   const getTitle = () => {
     if (searchType === "dateToday") return `Solicitudes de Hoy (${format(new Date(), "PPP", { locale: es })})`;
-    if (searchType === "dateCurrentMonth") return `Solicitudes de ${searchTerm}`;
+    // if (searchType === "dateCurrentMonth") return `Solicitudes de ${searchTerm}`; // Temporarily commented
     if (searchType === "dateSpecific" && searchTerm) return `Solicitudes del ${searchTerm}`;
     if (searchType === "dateRange" && searchTerm) return `Solicitudes para el rango: ${searchTerm}`;
     return "Solicitudes Encontradas";
   };
+
+  const isGuardadoPorFilterDisabled = currentUserRole === 'autorevisor' || currentUserRole === 'autorevisor_plus';
 
   return (
     <Card className="mt-6 w-full custom-shadow">
@@ -350,12 +354,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   Guardado Por
                   <Input
                     type="text"
-                    placeholder="Filtrar Guardado Por..."
+                    placeholder={isGuardadoPorFilterDisabled ? "Filtrado por rol" : "Filtrar Guardado Por..."}
                     value={filterGuardadoPorInput}
                     onChange={(e) => setFilterGuardadoPorInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
-                    disabled={currentUserRole === 'autorevisor'}
-                    readOnly={currentUserRole === 'autorevisor'}
+                    disabled={isGuardadoPorFilterDisabled}
+                    readOnly={isGuardadoPorFilterDisabled}
                   />
                 </TableHead>
                  <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
@@ -390,6 +394,26 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                 >
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-1">
+                        {currentUserRole === 'admin' && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => onDeleteSolicitud(solicitud.solicitudId)}
+                                  className="px-2 py-1 h-auto text-destructive hover:bg-destructive/10"
+                                  aria-label="Eliminar Solicitud"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Eliminar Solicitud</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -688,6 +712,9 @@ export default function DatabasePage() {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isPostingComment, setIsPostingComment] = useState(false);
 
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [solicitudToDeleteId, setSolicitudToDeleteId] = useState<string | null>(null);
+
 
   const [filterSolicitudIdInput, setFilterSolicitudIdInput] = useState('');
   const [filterNEInput, setFilterNEInput] = useState('');
@@ -715,7 +742,8 @@ export default function DatabasePage() {
 
 
   const fetchPermanentlyResolvedKeys = useCallback(async () => {
-    if (!user || (user.role !== 'revisor' && user.role !== 'calificador')) {
+    const rolesThatNeedValidations = ['revisor', 'calificador', 'admin'];
+    if (!user || !user.role || !rolesThatNeedValidations.includes(user.role)) {
       setIsLoadingPermanentlyResolvedKeys(false);
       return;
     }
@@ -813,15 +841,17 @@ export default function DatabasePage() {
         (s.examReference || '').toLowerCase().includes(term)
     );
 
-    if (user?.role === 'autorevisor' && user?.email) {
-      accumulatedData = accumulatedData.filter(s =>
-        (s.savedBy || '').toLowerCase() === user.email!.toLowerCase()
-      );
-    } else {
+    // Client-side 'Guardado Por' filter is now primarily for non-autorevisor roles,
+    // as autorevisor and autorevisor_plus filtering is handled by Firestore query.
+    // This client filter acts as a secondary refinement if filterGuardadoPorInput is used.
+    if (user?.role !== 'autorevisor' && user?.role !== 'autorevisor_plus') {
       accumulatedData = applyFilter(accumulatedData, filterGuardadoPorInput, (s, term) =>
         (s.savedBy || '').toLowerCase().includes(term)
       );
     }
+    // If 'autorevisor' or 'autorevisor_plus' and filterGuardadoPorInput is somehow populated (e.g. from old state),
+    // it might further filter, but the primary filter is the Firestore query.
+
     return accumulatedData;
   }, [
     fetchedSolicitudes,
@@ -836,13 +866,13 @@ export default function DatabasePage() {
     filterConsignatarioInput,
     filterDeclaracionInput,
     filterReferenciaInput,
-    filterGuardadoPorInput,
+    filterGuardadoPorInput, // Keep this in dependencies
     user?.role,
-    user?.email
+    // user?.email // Email is not directly used in this memo logic anymore for autorevisors
   ]);
 
   useEffect(() => {
-    if (displayedSolicitudes && (user?.role === 'calificador' || user?.role === 'revisor')) {
+    if (displayedSolicitudes && (user?.role === 'calificador' || user?.role === 'revisor' || user?.role === 'admin' || user?.role === 'autorevisor_plus')) {
       let paymentPend = 0;
       let recpDocsPend = 0;
       let notMinutaPend = 0;
@@ -1107,13 +1137,43 @@ export default function DatabasePage() {
   }, [user, toast, duplicateSets, permanentlyResolvedDuplicateKeys]);
 
 
+  const handleDeleteSolicitudRequest = (id: string) => {
+    if (user?.role !== 'admin') {
+      toast({ title: "Error", description: "No tiene permisos para eliminar solicitudes.", variant: "destructive" });
+      return;
+    }
+    setSolicitudToDeleteId(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSolicitud = async () => {
+    if (!solicitudToDeleteId || user?.role !== 'admin') {
+      toast({ title: "Error", description: "No se pudo eliminar la solicitud o acción no autorizada.", variant: "destructive" });
+      setIsDeleteDialogOpen(false);
+      return;
+    }
+    try {
+      const docRef = doc(db, "SolicitudCheques", solicitudToDeleteId);
+      await deleteDoc(docRef);
+      toast({ title: "Éxito", description: `Solicitud ${solicitudToDeleteId} eliminada.` });
+      setFetchedSolicitudes(prev => prev ? prev.filter(s => s.solicitudId !== solicitudToDeleteId) : null);
+      setIsDeleteDialogOpen(false);
+      setSolicitudToDeleteId(null);
+    } catch (err) {
+      console.error("Error deleting solicitud:", err);
+      toast({ title: "Error", description: "No se pudo eliminar la solicitud.", variant: "destructive" });
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
+
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
     if (isClient && !authLoading) {
-      const isAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor');
+      const isAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor' || user.role === 'admin' || user.role === 'autorevisor_plus');
       if (!isAuthorized && !isDetailViewVisible) {
         if (!fetchedSolicitudes) {
           router.push('/');
@@ -1123,10 +1183,18 @@ export default function DatabasePage() {
   }, [user, authLoading, router, isClient, fetchedSolicitudes, isDetailViewVisible]);
 
   useEffect(() => {
-    if (isClient && !authLoading && user?.role === 'autorevisor' && user?.email) {
-      setFilterGuardadoPorInput(user.email);
+    // For 'autorevisor' and 'autorevisor_plus', the filter input is based on their role's data scope.
+    // 'autorevisor' sees own email. 'autorevisor_plus' sees own and colleague's (this part is for display hint only).
+    if (isClient && !authLoading && user?.email) {
+      if (user.role === 'autorevisor') {
+        setFilterGuardadoPorInput(user.email);
+      } else if (user.role === 'autorevisor_plus') {
+        const colleagueEmail = user.canReviewUserEmail ? `, ${user.canReviewUserEmail}` : '';
+        setFilterGuardadoPorInput(`${user.email}${colleagueEmail}`); // Display both, but it's read-only
+      }
+      // For other roles, input is user-editable and might be cleared or not based on other logic.
     }
-  }, [isClient, authLoading, user?.role, user?.email]);
+  }, [isClient, authLoading, user]);
 
   const handleSearch = async (actionConfig?: { event?: FormEvent, preserveFilters?: boolean }) => {
     const event = actionConfig?.event;
@@ -1159,180 +1227,185 @@ export default function DatabasePage() {
       setFilterConsignatarioInput('');
       setFilterDeclaracionInput('');
       setFilterReferenciaInput('');
-      if (user?.role !== 'autorevisor') {
+      if (user?.role !== 'autorevisor' && user?.role !== 'autorevisor_plus') {
         setFilterGuardadoPorInput('');
       }
     }
 
 
     const solicitudsCollectionRef = collection(db, "SolicitudCheques");
-    let q;
     let termForDisplay = searchTermText.trim();
+    const queryConstraints: QueryConstraint[] = [];
+
+    // Always order by examDate descending
+    queryConstraints.push(orderBy("examDate", "desc"));
+
+    // Filter by 'savedBy' based on role
+    if (user?.email) {
+      if (user.role === 'autorevisor') {
+        queryConstraints.push(where("savedBy", "==", user.email));
+      } else if (user.role === 'autorevisor_plus' && user.canReviewUserEmail) {
+        queryConstraints.push(where("savedBy", "in", [user.email, user.canReviewUserEmail]));
+      }
+      // For other roles (revisor, calificador, admin), no 'savedBy' filter is applied here,
+      // allowing them to see all records based on date criteria, then filter client-side if needed.
+    }
+
 
     try {
       switch (searchType) {
         case "dateToday":
           const todayStart = startOfDay(new Date());
           const todayEnd = endOfDay(new Date());
-          q = query(solicitudsCollectionRef,
-            where("examDate", ">=", FirestoreTimestamp.fromDate(todayStart)),
-            where("examDate", "<=", FirestoreTimestamp.fromDate(todayEnd)),
-            orderBy("examDate", "desc")
-          );
+          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(todayStart)));
+          queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(todayEnd)));
           termForDisplay = format(new Date(), "PPP", { locale: es });
           break;
-        case "dateCurrentMonth":
-          const currentMonthStart = startOfMonth(new Date());
-          const currentMonthEnd = endOfMonth(new Date());
-          q = query(solicitudsCollectionRef,
-            where("examDate", ">=", FirestoreTimestamp.fromDate(currentMonthStart)),
-            where("examDate", "<=", FirestoreTimestamp.fromDate(currentMonthEnd)),
-            orderBy("examDate", "desc")
-          );
-          termForDisplay = format(new Date(), "MMMM yyyy", { locale: es });
-          break;
+        case "dateCurrentMonth": // Temporarily commented out
+          // const currentMonthStart = startOfMonth(new Date());
+          // const currentMonthEnd = endOfMonth(new Date());
+          // queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(currentMonthStart)));
+          // queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(currentMonthEnd)));
+          // termForDisplay = format(new Date(), "MMMM yyyy", { locale: es });
+          setError("Búsqueda por mes actual está temporalmente deshabilitada."); setIsLoading(false); return; // Prevent execution for this case
         case "dateSpecific":
           if (!selectedDate) { setError("Por favor, seleccione una fecha específica."); setIsLoading(false); return; }
           const specificDayStart = startOfDay(selectedDate);
           const specificDayEnd = endOfDay(selectedDate);
-          q = query(solicitudsCollectionRef,
-            where("examDate", ">=", FirestoreTimestamp.fromDate(specificDayStart)),
-            where("examDate", "<=", FirestoreTimestamp.fromDate(specificDayEnd)),
-            orderBy("examDate", "desc")
-          );
+          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(specificDayStart)));
+          queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(specificDayEnd)));
           termForDisplay = format(selectedDate, "PPP", { locale: es });
           break;
-        case "dateRange":
-          if (!datePickerStartDate || !datePickerEndDate) { setError("Por favor, seleccione una fecha de inicio y fin para el rango."); setIsLoading(false); return; }
-          if (datePickerEndDate < datePickerStartDate) { setError("La fecha de fin no puede ser anterior a la fecha de inicio."); setIsLoading(false); return; }
-          const rangeStart = startOfDay(datePickerStartDate);
-          const rangeEnd = endOfDay(datePickerEndDate);
-          q = query(solicitudsCollectionRef,
-            where("examDate", ">=", FirestoreTimestamp.fromDate(rangeStart)),
-            where("examDate", "<=", FirestoreTimestamp.fromDate(rangeEnd)),
-            orderBy("examDate", "desc")
-          );
-          termForDisplay = `${format(datePickerStartDate, "P", { locale: es })} - ${format(datePickerEndDate, "P", { locale: es })}`;
-          break;
+        case "dateRange": // Temporarily commented out
+          // if (!datePickerStartDate || !datePickerEndDate) { setError("Por favor, seleccione una fecha de inicio y fin para el rango."); setIsLoading(false); return; }
+          // if (datePickerEndDate < datePickerStartDate) { setError("La fecha de fin no puede ser anterior a la fecha de inicio."); setIsLoading(false); return; }
+          // const rangeStart = startOfDay(datePickerStartDate);
+          // const rangeEnd = endOfDay(datePickerEndDate);
+          // queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(rangeStart)));
+          // queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(rangeEnd)));
+          // termForDisplay = `${format(datePickerStartDate, "P", { locale: es })} - ${format(datePickerEndDate, "P", { locale: es })}`;
+          setError("Búsqueda por rango de fechas está temporalmente deshabilitada."); setIsLoading(false); return; // Prevent execution for this case
         default:
           setError("Tipo de búsqueda no válido."); setIsLoading(false); return;
       }
 
       setCurrentSearchTermForDisplay(termForDisplay);
 
-      if (q) {
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const dataPromises = querySnapshot.docs.map(async (docSnap) => {
-            const docData = docSnap.data();
-            const examDateValue = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : undefined);
-            const savedAtValue = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : undefined);
-            const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
-            const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
-            const emailMinutaLastUpdatedAt = docData.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? docData.emailMinutaLastUpdatedAt.toDate() : (docData.emailMinutaLastUpdatedAt instanceof Date ? docData.emailMinutaLastUpdatedAt : undefined);
+      const q = query(solicitudsCollectionRef, ...queryConstraints);
+      
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        const dataPromises = querySnapshot.docs.map(async (docSnap) => {
+          const docData = docSnap.data();
+          const examDateValue = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : undefined);
+          const savedAtValue = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : undefined);
+          const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
+          const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
+          const emailMinutaLastUpdatedAt = docData.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? docData.emailMinutaLastUpdatedAt.toDate() : (docData.emailMinutaLastUpdatedAt instanceof Date ? docData.emailMinutaLastUpdatedAt : undefined);
 
-            let commentsCount = 0;
-            try {
-              const commentsColRef = collection(db, "SolicitudCheques", docSnap.id, "comments");
-              const commentsSnapshot = await getCountFromServer(commentsColRef);
-              commentsCount = commentsSnapshot.data().count;
-            } catch (countError) {
-              console.error(`Error fetching comments count for ${docSnap.id}: `, countError);
-            }
-
-            return {
-              ...docData,
-              solicitudId: docSnap.id,
-              examDate: examDateValue,
-              savedAt: savedAtValue,
-              paymentStatus: docData.paymentStatus || null,
-              paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
-              paymentStatusLastUpdatedBy: docData.paymentStatusLastUpdatedBy || null,
-              recepcionDCStatus: docData.recepcionDCStatus ?? false,
-              recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
-              recepcionDCLastUpdatedBy: docData.recepcionDCLastUpdatedBy || null,
-              emailMinutaStatus: docData.emailMinutaStatus ?? false,
-              emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
-              emailMinutaLastUpdatedBy: docData.emailMinutaLastUpdatedBy || null,
-              examNe: docData.examNe || '',
-              examReference: docData.examReference || null,
-              examManager: docData.examManager || '',
-              examRecipient: docData.examRecipient || '',
-              monto: docData.monto ?? null,
-              montoMoneda: docData.montoMoneda || null,
-              cantidadEnLetras: docData.cantidadEnLetras || null,
-              consignatario: docData.consignatario || null,
-              declaracionNumero: docData.declaracionNumero || null,
-              unidadRecaudadora: docData.unidadRecaudadora || null,
-              codigo1: docData.codigo1 || null,
-              codigo2: docData.codigo2 || null,
-              banco: docData.banco || null,
-              bancoOtros: docData.bancoOtros || null,
-              numeroCuenta: docData.numeroCuenta || null,
-              monedaCuenta: docData.monedaCuenta || null,
-              monedaCuentaOtros: docData.monedaCuentaOtros || null,
-              elaborarChequeA: docData.elaborarChequeA || null,
-              elaborarTransferenciaA: docData.elaborarTransferenciaA || null,
-              impuestosPagadosCliente: docData.impuestosPagadosCliente ?? false,
-              impuestosPagadosRC: docData.impuestosPagadosRC || null,
-              impuestosPagadosTB: docData.impuestosPagadosTB || null,
-              impuestosPagadosCheque: docData.impuestosPagadosCheque || null,
-              impuestosPendientesCliente: docData.impuestosPendientesCliente ?? false,
-              soporte: docData.soporte ?? false,
-              documentosAdjuntos: docData.documentosAdjuntos ?? false,
-              constanciasNoRetencion: docData.constanciasNoRetencion ?? false,
-              constanciasNoRetencion1: docData.constanciasNoRetencion1 ?? false,
-              constanciasNoRetencion2: docData.constanciasNoRetencion2 ?? false,
-              pagoServicios: docData.pagoServicios ?? false,
-              tipoServicio: docData.tipoServicio || null,
-              otrosTipoServicio: docData.otrosTipoServicio || null,
-              facturaServicio: docData.facturaServicio || null,
-              institucionServicio: docData.institucionServicio || null,
-              correo: docData.correo || null,
-              observation: docData.observation || null,
-              savedBy: docData.savedBy || null,
-              commentsCount: commentsCount,
-            } as SolicitudRecord;
-          });
-
-          const data = await Promise.all(dataPromises);
-          setFetchedSolicitudes(data);
-
-          if (data && data.length > 1) {
-            const potentialDuplicatesMap = new Map<string, string[]>();
-            data.forEach(solicitud => {
-              if (solicitud.examNe && solicitud.examNe.trim() !== '' &&
-                  solicitud.monto !== null &&
-                  solicitud.montoMoneda && solicitud.montoMoneda.trim() !== '') {
-                const key = `${solicitud.examNe.trim()}-${solicitud.monto}-${solicitud.montoMoneda.trim()}`;
-                if (!potentialDuplicatesMap.has(key)) {
-                  potentialDuplicatesMap.set(key, []);
-                }
-                potentialDuplicatesMap.get(key)!.push(solicitud.solicitudId);
-              }
-            });
-
-            const newDuplicateSets = new Map<string, string[]>();
-            potentialDuplicatesMap.forEach((ids, key) => {
-              if (ids.length > 1) {
-                newDuplicateSets.set(key, ids);
-              }
-            });
-            setDuplicateSets(newDuplicateSets);
-
-          } else {
-             setDuplicateSets(new Map());
+          let commentsCount = 0;
+          try {
+            const commentsColRef = collection(db, "SolicitudCheques", docSnap.id, "comments");
+            const commentsSnapshot = await getCountFromServer(commentsColRef);
+            commentsCount = commentsSnapshot.data().count;
+          } catch (countError) {
+            console.error(`Error fetching comments count for ${docSnap.id}: `, countError);
           }
 
-        } else { setError("No se encontraron solicitudes para los criterios ingresados."); }
-      }
+          return {
+            ...docData,
+            solicitudId: docSnap.id,
+            examDate: examDateValue,
+            savedAt: savedAtValue,
+            paymentStatus: docData.paymentStatus || null,
+            paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
+            paymentStatusLastUpdatedBy: docData.paymentStatusLastUpdatedBy || null,
+            recepcionDCStatus: docData.recepcionDCStatus ?? false,
+            recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
+            recepcionDCLastUpdatedBy: docData.recepcionDCLastUpdatedBy || null,
+            emailMinutaStatus: docData.emailMinutaStatus ?? false,
+            emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
+            emailMinutaLastUpdatedBy: docData.emailMinutaLastUpdatedBy || null,
+            examNe: docData.examNe || '',
+            examReference: docData.examReference || null,
+            examManager: docData.examManager || '',
+            examRecipient: docData.examRecipient || '',
+            monto: docData.monto ?? null,
+            montoMoneda: docData.montoMoneda || null,
+            cantidadEnLetras: docData.cantidadEnLetras || null,
+            consignatario: docData.consignatario || null,
+            declaracionNumero: docData.declaracionNumero || null,
+            unidadRecaudadora: docData.unidadRecaudadora || null,
+            codigo1: docData.codigo1 || null,
+            codigo2: docData.codigo2 || null,
+            banco: docData.banco || null,
+            bancoOtros: docData.bancoOtros || null,
+            numeroCuenta: docData.numeroCuenta || null,
+            monedaCuenta: docData.monedaCuenta || null,
+            monedaCuentaOtros: docData.monedaCuentaOtros || null,
+            elaborarChequeA: docData.elaborarChequeA || null,
+            elaborarTransferenciaA: docData.elaborarTransferenciaA || null,
+            impuestosPagadosCliente: docData.impuestosPagadosCliente ?? false,
+            impuestosPagadosRC: docData.impuestosPagadosRC || null,
+            impuestosPagadosTB: docData.impuestosPagadosTB || null,
+            impuestosPagadosCheque: docData.impuestosPagadosCheque || null,
+            impuestosPendientesCliente: docData.impuestosPendientesCliente ?? false,
+            soporte: docData.soporte ?? false,
+            documentosAdjuntos: docData.documentosAdjuntos ?? false,
+            constanciasNoRetencion: docData.constanciasNoRetencion ?? false,
+            constanciasNoRetencion1: docData.constanciasNoRetencion1 ?? false,
+            constanciasNoRetencion2: docData.constanciasNoRetencion2 ?? false,
+            pagoServicios: docData.pagoServicios ?? false,
+            tipoServicio: docData.tipoServicio || null,
+            otrosTipoServicio: docData.otrosTipoServicio || null,
+            facturaServicio: docData.facturaServicio || null,
+            institucionServicio: docData.institucionServicio || null,
+            correo: docData.correo || null,
+            observation: docData.observation || null,
+            savedBy: docData.savedBy || null,
+            commentsCount: commentsCount,
+          } as SolicitudRecord;
+        });
+
+        const data = await Promise.all(dataPromises);
+        setFetchedSolicitudes(data);
+
+        if (data && data.length > 1) {
+          const potentialDuplicatesMap = new Map<string, string[]>();
+          data.forEach(solicitud => {
+            if (solicitud.examNe && solicitud.examNe.trim() !== '' &&
+                solicitud.monto !== null &&
+                solicitud.montoMoneda && solicitud.montoMoneda.trim() !== '') {
+              const key = `${solicitud.examNe.trim()}-${solicitud.monto}-${solicitud.montoMoneda.trim()}`;
+              if (!potentialDuplicatesMap.has(key)) {
+                potentialDuplicatesMap.set(key, []);
+              }
+              potentialDuplicatesMap.get(key)!.push(solicitud.solicitudId);
+            }
+          });
+
+          const newDuplicateSets = new Map<string, string[]>();
+          potentialDuplicatesMap.forEach((ids, key) => {
+            if (ids.length > 1) {
+              newDuplicateSets.set(key, ids);
+            }
+          });
+          setDuplicateSets(newDuplicateSets);
+
+        } else {
+           setDuplicateSets(new Map());
+        }
+
+      } else { setError("No se encontraron solicitudes para los criterios ingresados."); }
+      
     } catch (err: any) {
       console.error("Error fetching documents from Firestore: ", err);
       let userFriendlyError = "Error al buscar las solicitudes. Intente de nuevo.";
       if (err.code === 'permission-denied') {
         userFriendlyError = "No tiene permisos para acceder a esta información.";
-      } else if (err.code === 'failed-precondition') {
-            userFriendlyError = "Error de consulta: asegúrese de tener los índices necesarios creados en Firestore para los campos y orden seleccionados. La creación de índices puede tardar unos minutos. Por favor, cree este índice en la consola de Firestore (puede haber un enlace en la consola del navegador).";
+      } else if (err.code === 'failed-precondition' || (err.message && err.message.toLowerCase().includes('index'))) {
+            userFriendlyError = "Error de consulta: Es posible que se requiera un índice compuesto en Firestore que no existe. Por favor, revise la consola del navegador para ver un enlace que permita crear el índice necesario. La creación de índices puede tardar unos minutos.";
+            toast({ title: "Índice Requerido", description: "Es posible que necesite crear un índice compuesto en Firestore. Revise la consola del navegador (F12) para más detalles.", variant: "destructive", duration: 10000 });
       }
       setError(userFriendlyError);
     } finally { setIsLoading(false); }
@@ -1453,7 +1526,7 @@ export default function DatabasePage() {
   const renderSearchInputs = () => {
     switch (searchType) {
       case "dateToday": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes de hoy.</p>;
-      case "dateCurrentMonth": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes del mes actual.</p>;
+      // case "dateCurrentMonth": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes del mes actual.</p>; // Para rehabilitar, descomente esta línea y la correspondiente en el Select.
       case "dateSpecific":
         return (
           <Popover open={isSpecificDatePopoverOpen} onOpenChange={setIsSpecificDatePopoverOpen}>
@@ -1472,41 +1545,41 @@ export default function DatabasePage() {
             </PopoverContent>
           </Popover>
         );
-      case "dateRange":
-        return (
-          <div className="flex flex-col sm:flex-row gap-2 flex-grow">
-            <Popover open={isStartDatePopoverOpen} onOpenChange={setIsStartDatePopoverOpen}>
-                <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerStartDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerStartDate ? format(datePickerStartDate, "PPP", { locale: es }) : <span>Fecha Inicio</span>}</Button></PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={datePickerStartDate}
-                      onSelect={(date) => {
-                        setDatePickerStartDate(date);
-                        setIsStartDatePopoverOpen(false);
-                      }}
-                      initialFocus
-                      locale={es}
-                    />
-                </PopoverContent>
-            </Popover>
-            <Popover open={isEndDatePopoverOpen} onOpenChange={setIsEndDatePopoverOpen}>
-                <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerEndDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerEndDate ? format(datePickerEndDate, "PPP", { locale: es }) : <span>Fecha Fin</span>}</Button></PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={datePickerEndDate}
-                      onSelect={(date) => {
-                        setDatePickerEndDate(date);
-                        setIsEndDatePopoverOpen(false);
-                      }}
-                      initialFocus
-                      locale={es}
-                    />
-                </PopoverContent>
-            </Popover>
-          </div>
-        );
+      // case "dateRange": // Para rehabilitar, descomente esta sección y la correspondiente en el Select.
+      //   return (
+      //     <div className="flex flex-col sm:flex-row gap-2 flex-grow">
+      //       <Popover open={isStartDatePopoverOpen} onOpenChange={setIsStartDatePopoverOpen}>
+      //           <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerStartDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerStartDate ? format(datePickerStartDate, "PPP", { locale: es }) : <span>Fecha Inicio</span>}</Button></PopoverTrigger>
+      //           <PopoverContent className="w-auto p-0" align="start">
+      //               <Calendar
+      //                 mode="single"
+      //                 selected={datePickerStartDate}
+      //                 onSelect={(date) => {
+      //                   setDatePickerStartDate(date);
+      //                   setIsStartDatePopoverOpen(false);
+      //                 }}
+      //                 initialFocus
+      //                 locale={es}
+      //               />
+      //           </PopoverContent>
+      //       </Popover>
+      //       <Popover open={isEndDatePopoverOpen} onOpenChange={setIsEndDatePopoverOpen}>
+      //           <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerEndDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerEndDate ? format(datePickerEndDate, "PPP", { locale: es }) : <span>Fecha Fin</span>}</Button></PopoverTrigger>
+      //           <PopoverContent className="w-auto p-0" align="start">
+      //               <Calendar
+      //                 mode="single"
+      //                 selected={datePickerEndDate}
+      //                 onSelect={(date) => {
+      //                   setDatePickerEndDate(date);
+      //                   setIsEndDatePopoverOpen(false);
+      //                 }}
+      //                 initialFocus
+      //                 locale={es}
+      //               />
+      //           </PopoverContent>
+      //       </Popover>
+      //     </div>
+      //   );
       default: return null;
     }
   };
@@ -1548,9 +1621,11 @@ export default function DatabasePage() {
                   <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue placeholder="Tipo de búsqueda" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
-                    <SelectItem value="dateCurrentMonth">Por Fecha (Mes Actual)</SelectItem>
+                    {/* Para rehabilitar "Por Fecha (Mes Actual)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs: */}
+                    {/* <SelectItem value="dateCurrentMonth">Por Fecha (Mes Actual)</SelectItem> */}
                     <SelectItem value="dateSpecific">Por Fecha (Específica)</SelectItem>
-                    <SelectItem value="dateRange">Por Fecha (Rango)</SelectItem>
+                    {/* Para rehabilitar "Por Fecha (Rango)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs: */}
+                    {/* <SelectItem value="dateRange">Por Fecha (Rango)</SelectItem> */}
                   </SelectContent>
                 </Select>
                 {renderSearchInputs()}
@@ -1565,7 +1640,7 @@ export default function DatabasePage() {
             </form>
 
             {displayedSolicitudes && distinctPendingDocsCount > 5 && (
-              (user?.role === 'calificador' && (
+              ((user?.role === 'calificador' || user?.role === 'admin') && ( 
                 <Card className="mt-4 mb-6 bg-amber-50 border border-amber-300 custom-shadow">
                   <CardHeader className="pb-3 pt-4">
                     <CardTitle className="text-lg text-amber-800 flex items-center">
@@ -1587,12 +1662,12 @@ export default function DatabasePage() {
                   </CardContent>
                 </Card>
               )) ||
-              (user?.role === 'revisor' && (
+              (((user?.role === 'revisor') || (user?.role === 'autorevisor_plus' && user?.canReviewUserEmail)) && ( // Revisor and autorevisor_plus (who can review others) see this alert
                 <Card className="mt-4 mb-6 bg-sky-50 border border-sky-300 custom-shadow">
                   <CardHeader className="pb-3 pt-4">
                     <CardTitle className="text-lg text-sky-800 flex items-center">
                       <AlertTriangle className="h-5 w-5 mr-2 text-sky-600" />
-                      Alerta de Seguimiento (Revisores)
+                      Alerta de Seguimiento (Revisores / Supervisores)
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="text-sm text-sky-700 pb-4">
@@ -1605,7 +1680,7 @@ export default function DatabasePage() {
                           Con un Total de documentos con estados pendientes: {distinctPendingDocsCount}.
                       </p>
                     }
-                    <p className="font-semibold mt-2">Se solicita apoyo a revisores con el seguimiento.</p>
+                    <p className="font-semibold mt-2">Se solicita apoyo con el seguimiento.</p>
                   </CardContent>
                 </Card>
               ))
@@ -1626,6 +1701,7 @@ export default function DatabasePage() {
                 onOpenMessageDialog={openMessageDialog}
                 onViewDetails={handleViewDetailsInline}
                 onOpenCommentsDialog={openCommentsDialog}
+                onDeleteSolicitud={handleDeleteSolicitudRequest} 
                 onRefreshSearch={() => handleSearch({ preserveFilters: true })}
                 filterRecpDocsInput={filterRecpDocsInput}
                 setFilterRecpDocsInput={setFilterRecpDocsInput}
@@ -1739,6 +1815,22 @@ export default function DatabasePage() {
                 {isPostingComment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isPostingComment ? 'Publicando...' : 'Publicar Comentario'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Eliminación</DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+           Estas seguro de realizar esta opción. Operacion de borrar es permanente.
+          </DialogDescription>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => { setIsDeleteDialogOpen(false); setSolicitudToDeleteId(null); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmDeleteSolicitud}>Aceptar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
