@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { SolicitudRecord, InitialDataContext } from '@/types';
+import type { SolicitudRecord, InitialDataContext } from '@/types'; // InitialDataContext might not be needed here anymore for 'reference'
 import { Loader2, ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -72,7 +72,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
 
             setSolicitud({
               examNe: data.examNe || '',
-              examReference: data.examReference || null,
+              examReference: data.examReference || null, // This now holds the per-solicitud reference
               examManager: data.examManager || '',
               examDate: examDate,
               examRecipient: data.examRecipient || '',
@@ -121,6 +121,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
               emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
               emailMinutaLastUpdatedBy: data.emailMinutaLastUpdatedBy || null,
               commentsCount: data.commentsCount || 0,
+              hasOpenUrgentComment: data.hasOpenUrgentComment ?? false,
             });
           } else {
             setError("Solicitud no encontrada.");
@@ -176,12 +177,14 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     return <div className="text-center text-muted-foreground py-4">No se encontró la solicitud.</div>;
   }
   
-  const initialDataForDisplay: Partial<InitialDataContext> = {
+  // initialDataForDisplay will now directly use fields from the fetched solicitud
+  // No separate InitialDataContext type is strictly needed here for reference
+  const initialDataForDisplay = {
     recipient: solicitud.examRecipient,
     manager: solicitud.examManager,
     date: solicitud.examDate,
     ne: solicitud.examNe,
-    reference: solicitud.examReference || undefined,
+    reference: solicitud.examReference, // Using the per-solicitud reference
   };
 
   return (
@@ -208,6 +211,9 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
                     PAGADA
                   </Badge>
                 )}
+                 {solicitud.hasOpenUrgentComment && (
+                  <Badge variant="destructive" className="ml-2 text-xs whitespace-nowrap">URGENTE</Badge>
+                )}
             </div>
           </div>
           <div className="mb-3 p-4 border border-border rounded-md bg-secondary/30 card-print-styles">
@@ -228,7 +234,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 items-start mb-3">
               <div className="flex items-baseline py-1">
                 <Banknote className="h-4 w-4 mr-1.5 text-primary shrink-0" />
-                <p className="text-sm text-foreground break-words">{formatCurrency(solicitud.monto, solicitud.montoMoneda || undefined)}</p>
+                <p className="text-sm text-foreground break-words">{formatCurrency(solicitud.monto, solicitud.montoMoneda)}</p>
               </div>
               <div className="flex items-baseline py-1">
                 <FileText className="h-4 w-4 mr-1.5 text-primary shrink-0" />
@@ -334,4 +340,3 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     </div>
   );
 }
-    
