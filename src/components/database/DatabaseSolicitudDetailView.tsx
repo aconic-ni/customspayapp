@@ -177,14 +177,12 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     return <div className="text-center text-muted-foreground py-4">No se encontró la solicitud.</div>;
   }
   
-  // initialDataForDisplay will now directly use fields from the fetched solicitud
-  // No separate InitialDataContext type is strictly needed here for reference
   const initialDataForDisplay = {
     recipient: solicitud.examRecipient,
     manager: solicitud.examManager,
     date: solicitud.examDate,
     ne: solicitud.examNe,
-    reference: solicitud.examReference, // Using the per-solicitud reference
+    reference: solicitud.examReference || undefined, // Use per-solicitud reference, ensure undefined if null
   };
 
   return (
@@ -223,7 +221,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
                 <DetailItem label="De (Usuario)" value={initialDataForDisplay.manager} icon={User} />
                 <DetailItem label="Fecha de Solicitud" value={initialDataForDisplay.date} icon={CalendarDays} />
                 <DetailItem label="NE (Tracking NX1)" value={initialDataForDisplay.ne} icon={Info} />
-                <DetailItem label="Referencia" value={initialDataForDisplay.reference || 'N/A'} icon={FileText} className="md:col-span-2"/>
+                <DetailItem label="Referencia" value={initialDataForDisplay.reference} icon={FileText} className="md:col-span-2"/>
              </div>
           </div>
           
