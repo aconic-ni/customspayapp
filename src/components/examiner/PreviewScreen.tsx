@@ -11,8 +11,6 @@ import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-// PDF Download is removed
-
 
 const PreviewDetailItem: React.FC<{ label: string; value?: string | number | null | boolean | Date, icon?: React.ElementType, className?: string }> = ({ label, value, icon: Icon, className }) => {
   let displayValue: string;
@@ -95,13 +93,30 @@ export function PreviewScreen() {
 
   const handleDownloadExcel = () => {
     if (initialContextData) {
-      downloadDetailedExcelFile({ ...initialContextData, solicitudes: solicitudes } as InitialDataContext & {solicitudes: SolicitudData[]});
+      // Cast initialContextData to ensure it matches the expected type for downloadDetailedExcelFile
+      const exportData: InitialDataContext & { solicitudes: SolicitudData[] } = {
+        ne: initialContextData.ne,
+        manager: initialContextData.manager,
+        date: initialContextData.date,
+        recipient: initialContextData.recipient,
+        // reference is no longer part of initialContextData, but SolicitudData now has it
+        solicitudes: solicitudes 
+      };
+      downloadDetailedExcelFile(exportData);
     }
   };
 
   const handleDownloadTxt = () => {
      if (initialContextData) {
-      downloadTxtFile(initialContextData, solicitudes);
+      // Cast initialContextData to ensure it matches the expected type for downloadTxtFile
+      const txtData: InitialDataContext = {
+        ne: initialContextData.ne,
+        manager: initialContextData.manager,
+        date: initialContextData.date,
+        recipient: initialContextData.recipient,
+        // reference is no longer part of initialContextData
+      };
+      downloadTxtFile(txtData, solicitudes);
     }
   }
 
@@ -118,8 +133,8 @@ export function PreviewScreen() {
             <PreviewDetailItem label="A (Destinatario)" value={initialContextData.recipient} icon={Send} />
             <PreviewDetailItem label="De (Usuario)" value={initialContextData.manager} icon={User} />
             <PreviewDetailItem label="Fecha de Solicitud" value={initialContextData.date} icon={CalendarDays} />
-            <PreviewDetailItem label="NE (Tracking NX1)" value={initialContextData.ne} icon={Info} />
-            <PreviewDetailItem label="Referencia" value={initialContextData.reference || 'N/A'} icon={FileText} />
+            <PreviewDetailItem label="NE (Tracking NX1)" value={initialContextData.ne} icon={Info} className="sm:col-span-2" />
+            {/* General reference removed from here */}
           </div>
         </div>
 
@@ -134,6 +149,9 @@ export function PreviewScreen() {
                       Solicitud {index + 1} ({solicitud.id})
                     </h5>
                     <div className="space-y-3 divide-y divide-border/50">
+                       <div className="pt-2">
+                          <PreviewDetailItem label="Referencia" value={solicitud.reference || 'N/A'} icon={FileText} />
+                       </div>
 
                       <div className="pt-2">
                         <p className="text-sm font-medium text-muted-foreground mb-1">
