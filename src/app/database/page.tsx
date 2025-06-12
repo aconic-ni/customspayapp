@@ -48,6 +48,9 @@ import DatabaseSolicitudDetailView from '@/components/database/DatabaseSolicitud
 
 type SearchType = "dateToday" | "dateSpecific" | "dateRange" | "dateCurrentMonth";
 
+const URGENT_KEYWORDS_LOWER = ["urgente", "urgent", "urge", "apoyo", "apoyar"];
+
+
 const formatCurrencyFetched = (amount?: number | string | null, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
     const num = Number(amount);
@@ -64,7 +67,7 @@ const formatCurrencyFetched = (amount?: number | string | null, currency?: strin
 const renderSolicitudStatusBadges = (solicitud: SolicitudRecord) => {
   const badges = [];
   if (solicitud.documentosAdjuntos) badges.push(<Badge key="docs" variant="outline" className="bg-blue-100 text-blue-700 whitespace-nowrap text-xs">Docs Adjuntos</Badge>);
-  if (solicitud.soporte) badges.push(<Badge key="soporte" variant="outline" className="bg-yellow-100 text-yellow-700 whitespace-nowrap text-xs">Soporte</Badge>);
+  if (solicitud.soporte) badges.push(<Badge key="soporte" variant="outline" className="bg-amber-100 text-amber-700 whitespace-nowrap text-xs">Soporte</Badge>);
   if (solicitud.impuestosPendientesCliente) badges.push(<Badge key="impuestos" variant="outline" className="bg-red-100 text-red-700 whitespace-nowrap text-xs">Imp. Pendientes</Badge>);
   if (solicitud.constanciasNoRetencion) badges.push(<Badge key="retencion" variant="outline" className="bg-purple-100 text-purple-700 whitespace-nowrap text-xs">Const. No Ret.</Badge>);
   if (solicitud.pagoServicios) badges.push(<Badge key="servicios" variant="outline" className="bg-teal-100 text-teal-700 whitespace-nowrap text-xs">Pago Serv.</Badge>);
@@ -87,8 +90,9 @@ interface SearchResultsTableProps {
   onOpenMessageDialog: (solicitudId: string) => void;
   onViewDetails: (solicitud: SolicitudRecord) => void;
   onOpenCommentsDialog: (solicitudId: string) => void;
-  onDeleteSolicitud: (solicitudId: string) => void; // New prop
+  onDeleteSolicitud: (solicitudId: string) => void; 
   onRefreshSearch: () => void;
+  onFilterByDuplicateSet: (ids: string[]) => void;
   filterRecpDocsInput: string;
   setFilterRecpDocsInput: (value: string) => void;
   filterNotMinutaInput: string;
@@ -116,8 +120,8 @@ interface SearchResultsTableProps {
   duplicateWarning?: string | null;
   duplicateSets: Map<string, string[]>;
   onResolveDuplicate: (key: string, resolution: "validated_not_duplicate" | "deletion_requested") => void;
-  resolvedDuplicateKeys: string[]; // Keys resolved in current session
-  permanentlyResolvedDuplicateKeys: string[]; // Keys resolved in Firestore
+  resolvedDuplicateKeys: string[]; 
+  permanentlyResolvedDuplicateKeys: string[]; 
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -131,8 +135,9 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   onOpenMessageDialog,
   onViewDetails,
   onOpenCommentsDialog,
-  onDeleteSolicitud, // Destructure new prop
+  onDeleteSolicitud, 
   onRefreshSearch,
+  onFilterByDuplicateSet,
   filterRecpDocsInput,
   setFilterRecpDocsInput,
   filterNotMinutaInput,
@@ -157,7 +162,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   setFilterGuardadoPorInput,
   filterEstadoSolicitudInput,
   setFilterEstadoSolicitudInput,
-  duplicateWarning,
   duplicateSets,
   onResolveDuplicate,
   resolvedDuplicateKeys,
@@ -179,18 +183,15 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   if (!solicitudes || solicitudes.length === 0) {
     let message = "No se encontraron solicitudes para los criterios ingresados.";
     if (searchType === "dateToday") message = "No se encontraron solicitudes para hoy."
-    // Para rehabilitar "Por Fecha (Mes Actual)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs:
-    // else if (searchType === "dateCurrentMonth") message = `No se encontraron solicitudes para ${searchTerm}.`
+    else if (searchType === "dateCurrentMonth") message = "No se encontraron solicitudes para el mes actual."
     return <p className="text-muted-foreground text-center py-4">{message}</p>;
   }
 
   const getTitle = () => {
     if (searchType === "dateToday") return `Solicitudes de Hoy (${format(new Date(), "PPP", { locale: es })})`;
-    // Para rehabilitar "Por Fecha (Mes Actual)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs:
-    // if (searchType === "dateCurrentMonth") return `Solicitudes de ${searchTerm}`;
+    if (searchType === "dateCurrentMonth") return `Solicitudes del Mes Actual (${format(new Date(), "MMMM yyyy", { locale: es })})`;
     if (searchType === "dateSpecific" && searchTerm) return `Solicitudes del ${searchTerm}`;
-    // Para rehabilitar "Por Fecha (Rango)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs:
-    // if (searchType === "dateRange" && searchTerm) return `Solicitudes para el rango: ${searchTerm}`;
+    if (searchType === "dateRange" && searchTerm) return `Solicitudes para ${searchTerm}`;
     return "Solicitudes Encontradas";
   };
 
@@ -216,26 +217,36 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   </div>
                   <p>Se encontraron múltiples solicitudes con el mismo NE, Monto y Moneda. IDs: {ids.join(', ')}.</p>
                   <p className="mt-1">Por favor, revise y valide esta situación.</p>
-                  {currentUserRole === 'calificador' && (
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-green-600 text-green-700 hover:bg-green-100 hover:text-green-800"
-                        onClick={() => onResolveDuplicate(key, 'validated_not_duplicate')}
-                      >
-                        <ShieldCheck className="mr-2 h-4 w-4" /> Validado (No Duplicado)
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-orange-600 text-orange-700 hover:bg-orange-100 hover:text-orange-800"
-                        onClick={() => onResolveDuplicate(key, 'deletion_requested')}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" /> Solicitar Eliminación
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-primary text-primary hover:bg-primary/10 hover:text-primary-darker"
+                      onClick={() => onFilterByDuplicateSet(ids)}
+                    >
+                      <Search className="mr-2 h-4 w-4" /> Ver solo este conjunto
+                    </Button>
+                    {currentUserRole === 'calificador' && (
+                        <>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-green-600 text-green-700 hover:bg-green-100 hover:text-green-800"
+                            onClick={() => onResolveDuplicate(key, 'validated_not_duplicate')}
+                        >
+                            <ShieldCheck className="mr-2 h-4 w-4" /> Validado (No Duplicado)
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-orange-600 text-orange-700 hover:bg-orange-100 hover:text-orange-800"
+                            onClick={() => onResolveDuplicate(key, 'deletion_requested')}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" /> Solicitar Eliminación
+                        </Button>
+                        </>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -384,16 +395,23 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                 const isResolvedInSession = resolvedDuplicateKeys.includes(duplicateKeyForThisRow);
                 const isPermanentlyResolved = permanentlyResolvedDuplicateKeys.includes(duplicateKeyForThisRow);
                 const isEffectivelyResolved = isResolvedInSession || isPermanentlyResolved;
+                const isUrgent = solicitud.hasOpenUrgentComment;
 
+                let rowClass = 'hover:bg-muted/50 dark:hover:bg-muted/80';
+                if (isUrgent) {
+                  rowClass = 'bg-red-200 hover:bg-red-300 dark:bg-red-600/40 dark:hover:bg-red-600/50';
+                } else if (isMarkedAsDuplicate && !isEffectivelyResolved) {
+                  rowClass = 'bg-rose-200 hover:bg-rose-300 dark:bg-rose-500/50 dark:hover:bg-rose-500/60';
+                } else if (isMarkedAsDuplicate && isEffectivelyResolved) {
+                  rowClass = 'bg-emerald-200 hover:bg-emerald-300 dark:bg-emerald-500/50 dark:hover:bg-emerald-500/60';
+                } else if (solicitud.soporte) {
+                  rowClass = 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-700/30 dark:hover:bg-amber-700/40';
+                }
+                
                 return (
                 <TableRow
                   key={solicitud.solicitudId}
-                  className={cn({
-                    'bg-yellow-50 dark:bg-yellow-800/30 hover:bg-yellow-100 dark:hover:bg-yellow-800/40': solicitud.soporte && !isMarkedAsDuplicate,
-                    'bg-red-50 dark:bg-red-800/30 hover:bg-red-100 dark:hover:bg-red-800/40': isMarkedAsDuplicate && !isEffectivelyResolved,
-                    'bg-green-50 dark:bg-green-800/30 hover:bg-green-100 dark:hover:bg-green-800/40': isMarkedAsDuplicate && isEffectivelyResolved, 
-                    'hover:bg-muted/50': !solicitud.soporte && !isMarkedAsDuplicate,
-                  })}
+                  className={cn(rowClass)}
                 >
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-1">
@@ -486,6 +504,22 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                         {(!solicitud.paymentStatus || (solicitud.paymentStatus && !solicitud.paymentStatus.startsWith('Error:') && solicitud.paymentStatus !== 'Pagado')) && (
                              <Badge variant="outline">Pendiente</Badge>
                         )}
+                        {(solicitud.paymentStatusLastUpdatedAt || solicitud.paymentStatusLastUpdatedBy) && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                  <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">
+                                <p>Última actualización (Pago):</p>
+                                {solicitud.paymentStatusLastUpdatedBy && <p>Por: {solicitud.paymentStatusLastUpdatedBy}</p>}
+                                {solicitud.paymentStatusLastUpdatedAt && solicitud.paymentStatusLastUpdatedAt instanceof Date && <p>Fecha: {format(solicitud.paymentStatusLastUpdatedAt, "Pp", { locale: es })}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center space-x-1">
@@ -536,6 +570,22 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                             ) : (
                                 <Badge variant="outline">Pendiente</Badge>
                             )}
+                            {(solicitud.recepcionDCLastUpdatedAt || solicitud.recepcionDCLastUpdatedBy) && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                      <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="text-xs">
+                                    <p>Última actualización (Recep. Doc.):</p>
+                                    {solicitud.recepcionDCLastUpdatedBy && <p>Por: {solicitud.recepcionDCLastUpdatedBy}</p>}
+                                    {solicitud.recepcionDCLastUpdatedAt && solicitud.recepcionDCLastUpdatedAt instanceof Date && <p>Fecha: {format(solicitud.recepcionDCLastUpdatedAt, "Pp", { locale: es })}</p>}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                         </div>
                      ) : (
                         <div className="flex items-center space-x-1">
@@ -581,6 +631,22 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                           </Badge>
                         ) : (
                           <Badge variant="outline">Pendiente</Badge>
+                        )}
+                        {(solicitud.emailMinutaLastUpdatedAt || solicitud.emailMinutaLastUpdatedBy) && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                  <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">
+                                <p>Última actualización (Email Minuta):</p>
+                                {solicitud.emailMinutaLastUpdatedBy && <p>Por: {solicitud.emailMinutaLastUpdatedBy}</p>}
+                                {solicitud.emailMinutaLastUpdatedAt && solicitud.emailMinutaLastUpdatedAt instanceof Date && <p>Fecha: {format(solicitud.emailMinutaLastUpdatedAt, "Pp", { locale: es })}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </div>
                     ) : (
@@ -702,6 +768,7 @@ export default function DatabasePage() {
   const [resolvedDuplicateKeys, setResolvedDuplicateKeys] = useState<string[]>([]);
   const [permanentlyResolvedDuplicateKeys, setPermanentlyResolvedDuplicateKeys] = useState<string[]>([]);
   const [isLoadingPermanentlyResolvedKeys, setIsLoadingPermanentlyResolvedKeys] = useState(true);
+  const [duplicateFilterIds, setDuplicateFilterIds] = useState<string[] | null>(null);
 
 
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
@@ -714,6 +781,8 @@ export default function DatabasePage() {
   const [newCommentText, setNewCommentText] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isPostingComment, setIsPostingComment] = useState(false);
+  const [isNewCommentUrgent, setIsNewCommentUrgent] = useState(false);
+
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [solicitudToDeleteId, setSolicitudToDeleteId] = useState<string | null>(null);
@@ -746,8 +815,7 @@ export default function DatabasePage() {
 
   const fetchPermanentlyResolvedKeys = useCallback(async () => {
     const rolesThatNeedValidations = ['revisor', 'calificador', 'admin'];
-    // Exclude autorevisor_plus from fetching these as they don't interact with this system part
-    if (!user || !user.role || !rolesThatNeedValidations.includes(user.role) || user.role === 'autorevisor_plus') {
+    if (!user || !user.role || !rolesThatNeedValidations.includes(user.role)) {
       setIsLoadingPermanentlyResolvedKeys(false);
       return;
     }
@@ -850,6 +918,12 @@ export default function DatabasePage() {
         (s.savedBy || '').toLowerCase().includes(term)
       );
     }
+
+    if (duplicateFilterIds && duplicateFilterIds.length > 0) {
+        accumulatedData = accumulatedData.filter(s => duplicateFilterIds.includes(s.solicitudId));
+    }
+
+
     return accumulatedData;
   }, [
     fetchedSolicitudes,
@@ -866,6 +940,7 @@ export default function DatabasePage() {
     filterReferenciaInput,
     filterGuardadoPorInput,
     user?.role,
+    duplicateFilterIds, 
   ]);
 
   useEffect(() => {
@@ -912,22 +987,44 @@ export default function DatabasePage() {
     }
     const docRef = doc(db, "SolicitudCheques", solicitudId);
     try {
-      await updateDoc(docRef, {
+      const batch = writeBatch(db);
+      const updates: Record<string, any> = {
         paymentStatus: newPaymentStatus,
         paymentStatusLastUpdatedAt: serverTimestamp(),
         paymentStatusLastUpdatedBy: user.email,
-      });
-      toast({ title: "Éxito", description: `Estado de pago actualizado para ${solicitudId}.` });
+      };
+
+      if (newPaymentStatus === 'Pagado') {
+        updates.hasOpenUrgentComment = false; 
+        updates.emailMinutaStatus = true; 
+        updates.emailMinutaLastUpdatedAt = serverTimestamp();
+        updates.emailMinutaLastUpdatedBy = user.email;
+      }
+      
+      batch.update(docRef, updates);
+      await batch.commit();
+      
+      toast({ title: "Éxito", description: `Estado de pago${newPaymentStatus === 'Pagado' ? ' y minuta' : ''} actualizado para ${solicitudId}.` });
+
       setFetchedSolicitudes(prev =>
-        prev?.map(s =>
-          s.solicitudId === solicitudId
-            ? { ...s,
-                paymentStatus: newPaymentStatus === null ? null : newPaymentStatus,
-                paymentStatusLastUpdatedAt: new Date(),
-                paymentStatusLastUpdatedBy: user.email!
-              }
-            : s
-        ) || null
+        prev?.map(s => {
+          if (s.solicitudId === solicitudId) {
+            const updatedSol: SolicitudRecord = {
+              ...s,
+              paymentStatus: newPaymentStatus === null ? null : newPaymentStatus,
+              paymentStatusLastUpdatedAt: new Date(),
+              paymentStatusLastUpdatedBy: user.email!,
+            };
+            if (newPaymentStatus === 'Pagado') {
+              updatedSol.hasOpenUrgentComment = false;
+              updatedSol.emailMinutaStatus = true;
+              updatedSol.emailMinutaLastUpdatedAt = new Date();
+              updatedSol.emailMinutaLastUpdatedBy = user.email!;
+            }
+            return updatedSol;
+          }
+          return s;
+        }) || null
       );
     } catch (err) {
       console.error("Error updating payment status: ", err);
@@ -1023,6 +1120,7 @@ export default function DatabasePage() {
 
   const openCommentsDialog = async (solicitudId: string) => {
     setCurrentSolicitudIdForComments(solicitudId);
+    setIsNewCommentUrgent(false); // Reset urgency toggle
     setComments([]);
     setIsLoadingComments(true);
     setIsCommentsDialogOpen(true);
@@ -1053,6 +1151,7 @@ export default function DatabasePage() {
     setIsCommentsDialogOpen(false);
     setCurrentSolicitudIdForComments(null);
     setNewCommentText('');
+    setIsNewCommentUrgent(false);
     setComments([]);
   };
 
@@ -1075,18 +1174,31 @@ export default function DatabasePage() {
         userEmail: user.email,
         createdAt: serverTimestamp(),
       };
-      const docRef = await addDoc(commentsCollectionRef, newCommentData);
+      const docRefComment = await addDoc(commentsCollectionRef, newCommentData);
 
-      setComments(prev => [...prev, { ...newCommentData, id: docRef.id, createdAt: new Date() } as CommentRecord]);
+      let newHasOpenUrgentCommentFlag: boolean | undefined = undefined;
+      if (isNewCommentUrgent) {
+        const solicitudDocRef = doc(db, "SolicitudCheques", currentSolicitudIdForComments);
+        await updateDoc(solicitudDocRef, { hasOpenUrgentComment: true });
+        newHasOpenUrgentCommentFlag = true;
+      }
+
+      setComments(prev => [...prev, { ...newCommentData, id: docRefComment.id, createdAt: new Date() } as CommentRecord]);
       setNewCommentText('');
+      setIsNewCommentUrgent(false);
       toast({ title: "Éxito", description: "Comentario publicado." });
 
       setFetchedSolicitudes(prevSolicitudes =>
-        prevSolicitudes?.map(s =>
-          s.solicitudId === currentSolicitudIdForComments
-            ? { ...s, commentsCount: (s.commentsCount ?? 0) + 1 }
-            : s
-        ) || null
+        prevSolicitudes?.map(s => {
+          if (s.solicitudId === currentSolicitudIdForComments) {
+            const updatedSol: SolicitudRecord = { ...s, commentsCount: (s.commentsCount ?? 0) + 1 };
+            if (newHasOpenUrgentCommentFlag !== undefined) {
+              updatedSol.hasOpenUrgentComment = newHasOpenUrgentCommentFlag;
+            }
+            return updatedSol;
+          }
+          return s;
+        }) || null
       );
 
     } catch (err) {
@@ -1204,6 +1316,7 @@ export default function DatabasePage() {
     setError(null);
     setFetchedSolicitudes(null);
     setDuplicateSets(new Map());
+    setDuplicateFilterIds(null); 
     if (!preserveFilters) {
       setResolvedDuplicateKeys([]);
     }
@@ -1242,7 +1355,6 @@ export default function DatabasePage() {
         const emailsToQuery = [user.email, ...user.canReviewUserEmails];
         queryConstraints.push(where("savedBy", "in", emailsToQuery));
       } else if (user.role === 'autorevisor_plus' && (!user.canReviewUserEmails || user.canReviewUserEmails.length === 0)) {
-        // Autorevisor_plus with no colleagues assigned, only query their own
         queryConstraints.push(where("savedBy", "==", user.email));
       }
     }
@@ -1258,14 +1370,12 @@ export default function DatabasePage() {
           termForDisplay = format(new Date(), "PPP", { locale: es });
           break;
         case "dateCurrentMonth":
-          // Para rehabilitar, descomente la lógica y quite el error.
-          setError("Búsqueda por mes actual está temporalmente deshabilitada."); setIsLoading(false); return;
-          // const currentMonthStart = startOfMonth(new Date());
-          // const currentMonthEnd = endOfMonth(new Date());
-          // queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(currentMonthStart)));
-          // queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(currentMonthEnd)));
-          // termForDisplay = format(new Date(), "MMMM yyyy", { locale: es });
-          // break;
+          const monthStart = startOfMonth(new Date());
+          const monthEnd = endOfMonth(new Date());
+          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(monthStart)));
+          queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(monthEnd)));
+          termForDisplay = format(new Date(), "MMMM yyyy", { locale: es });
+          break;
         case "dateSpecific":
           if (!selectedDate) { setError("Por favor, seleccione una fecha específica."); setIsLoading(false); return; }
           const specificDayStart = startOfDay(selectedDate);
@@ -1275,16 +1385,14 @@ export default function DatabasePage() {
           termForDisplay = format(selectedDate, "PPP", { locale: es });
           break;
         case "dateRange":
-          // Para rehabilitar, descomente la lógica y quite el error.
-          setError("Búsqueda por rango de fechas está temporalmente deshabilitada."); setIsLoading(false); return;
-          // if (!datePickerStartDate || !datePickerEndDate) { setError("Por favor, seleccione una fecha de inicio y fin para el rango."); setIsLoading(false); return; }
-          // if (datePickerEndDate < datePickerStartDate) { setError("La fecha de fin no puede ser anterior a la fecha de inicio."); setIsLoading(false); return; }
-          // const rangeStart = startOfDay(datePickerStartDate);
-          // const rangeEnd = endOfDay(datePickerEndDate);
-          // queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(rangeStart)));
-          // queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(rangeEnd)));
-          // termForDisplay = `${format(datePickerStartDate, "P", { locale: es })} - ${format(datePickerEndDate, "P", { locale: es })}`;
-          // break;
+          if (!datePickerStartDate || !datePickerEndDate) { setError("Por favor, seleccione un rango de fechas (inicio y fin)."); setIsLoading(false); return; }
+          if (datePickerStartDate > datePickerEndDate) { setError("La fecha de inicio no puede ser posterior a la fecha de fin."); setIsLoading(false); return; }
+          const rangeStart = startOfDay(datePickerStartDate);
+          const rangeEnd = endOfDay(datePickerEndDate);
+          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(rangeStart)));
+          queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(rangeEnd)));
+          termForDisplay = `Rango: ${format(datePickerStartDate, "dd/MM/yy", { locale: es })} - ${format(datePickerEndDate, "dd/MM/yy", { locale: es })}`;
+          break;
         default:
           setError("Tipo de búsqueda no válido."); setIsLoading(false); return;
       }
@@ -1364,6 +1472,7 @@ export default function DatabasePage() {
             observation: docData.observation || null,
             savedBy: docData.savedBy || null,
             commentsCount: commentsCount,
+            hasOpenUrgentComment: docData.hasOpenUrgentComment ?? false,
           } as SolicitudRecord;
         });
 
@@ -1411,6 +1520,11 @@ export default function DatabasePage() {
     } finally { setIsLoading(false); }
   };
 
+  const handleFilterByDuplicateSet = useCallback((ids: string[]) => {
+    setDuplicateFilterIds(ids);
+    toast({ title: "Filtro Aplicado", description: `Mostrando ${ids.length} solicitudes del conjunto de duplicados.` });
+  }, [toast]);
+
   const handleExport = async () => {
     const dataToUse = displayedSolicitudes || [];
     if (dataToUse.length === 0) {
@@ -1430,7 +1544,7 @@ export default function DatabasePage() {
       "Constancias de No Retención", "Constancia 1%", "Constancia 2%",
       "Pago de Servicios", "Tipo de Servicio", "Otro Tipo de Servicio", "Factura Servicio", "Institución Servicio",
       "Correo Notificación", "Observación", "Usuario (De)",
-      "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)", "Comentarios"
+      "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)", "Comentarios", "Comentario Urgente Abierto"
     ];
 
     const dataToExportPromises = dataToUse.map(async (s) => {
@@ -1508,6 +1622,7 @@ export default function DatabasePage() {
         "Actualizado Por (Pago)": s.paymentStatusLastUpdatedBy || 'N/A',
         "Fecha Actualización (Pago)": s.paymentStatusLastUpdatedAt && s.paymentStatusLastUpdatedAt instanceof Date ? format(s.paymentStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "Comentarios": commentsString,
+        "Comentario Urgente Abierto": s.hasOpenUrgentComment ? 'Sí' : 'No',
       };
     });
 
@@ -1526,8 +1641,7 @@ export default function DatabasePage() {
   const renderSearchInputs = () => {
     switch (searchType) {
       case "dateToday": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes de hoy.</p>;
-      // case "dateCurrentMonth": // Para rehabilitar, descomente esta línea y la lógica en handleSearch.
-      //  return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes del mes actual.</p>;
+      case "dateCurrentMonth": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes del mes actual.</p>;
       case "dateSpecific":
         return (
           <Popover open={isSpecificDatePopoverOpen} onOpenChange={setIsSpecificDatePopoverOpen}>
@@ -1546,41 +1660,31 @@ export default function DatabasePage() {
             </PopoverContent>
           </Popover>
         );
-      // case "dateRange": // Para rehabilitar, descomente esta sección y la lógica en handleSearch.
-      //   return (
-      //     <div className="flex flex-col sm:flex-row gap-2 flex-grow">
-      //       <Popover open={isStartDatePopoverOpen} onOpenChange={setIsStartDatePopoverOpen}>
-      //           <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerStartDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerStartDate ? format(datePickerStartDate, "PPP", { locale: es }) : <span>Fecha Inicio</span>}</Button></PopoverTrigger>
-      //           <PopoverContent className="w-auto p-0" align="start">
-      //               <Calendar
-      //                 mode="single"
-      //                 selected={datePickerStartDate}
-      //                 onSelect={(date) => {
-      //                   setDatePickerStartDate(date);
-      //                   setIsStartDatePopoverOpen(false);
-      //                 }}
-      //                 initialFocus
-      //                 locale={es}
-      //               />
-      //           </PopoverContent>
-      //       </Popover>
-      //       <Popover open={isEndDatePopoverOpen} onOpenChange={setIsEndDatePopoverOpen}>
-      //           <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-1/2 justify-start text-left font-normal", !datePickerEndDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{datePickerEndDate ? format(datePickerEndDate, "PPP", { locale: es }) : <span>Fecha Fin</span>}</Button></PopoverTrigger>
-      //           <PopoverContent className="w-auto p-0" align="start">
-      //               <Calendar
-      //                 mode="single"
-      //                 selected={datePickerEndDate}
-      //                 onSelect={(date) => {
-      //                   setDatePickerEndDate(date);
-      //                   setIsEndDatePopoverOpen(false);
-      //                 }}
-      //                 initialFocus
-      //                 locale={es}
-      //               />
-      //           </PopoverContent>
-      //       </Popover>
-      //     </div>
-      //   );
+      case "dateRange":
+        return (
+          <div className="flex flex-col sm:flex-row gap-2 flex-grow">
+            <Popover open={isStartDatePopoverOpen} onOpenChange={setIsStartDatePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !datePickerStartDate && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />{datePickerStartDate ? format(datePickerStartDate, "dd/MM/yy", { locale: es }) : <span>Fecha Inicio</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={datePickerStartDate} onSelect={(date) => {setDatePickerStartDate(date); setIsStartDatePopoverOpen(false);}} initialFocus locale={es}/>
+              </PopoverContent>
+            </Popover>
+            <Popover open={isEndDatePopoverOpen} onOpenChange={setIsEndDatePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !datePickerEndDate && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />{datePickerEndDate ? format(datePickerEndDate, "dd/MM/yy", { locale: es }) : <span>Fecha Fin</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={datePickerEndDate} onSelect={(date) => {setDatePickerEndDate(date); setIsEndDatePopoverOpen(false);}} initialFocus locale={es}/>
+              </PopoverContent>
+            </Popover>
+          </div>
+        );
       default: return null;
     }
   };
@@ -1596,7 +1700,7 @@ export default function DatabasePage() {
           <div className="mb-4">
              <Button
                 onClick={handleBackToTable}
-                className="bg-green-600 text-white hover:bg-green-600 hover:text-white"
+                className="bg-green-600 text-white hover:bg-green-700 hover:text-white"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Búsqueda
              </Button>
@@ -1606,6 +1710,10 @@ export default function DatabasePage() {
       </AppShell>
     );
   }
+
+  const isUserAdminOrRevisor = user?.role === 'admin' || user?.role === 'revisor';
+  const isUserAllowedToMarkUrgent = user?.role === 'autorevisor' || user?.role === 'autorevisor_plus' || user?.role === 'revisor';
+
 
   return (
     <AppShell>
@@ -1622,11 +1730,13 @@ export default function DatabasePage() {
                   <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue placeholder="Tipo de búsqueda" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
-                    {/* Para rehabilitar "Por Fecha (Mes Actual)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs: */}
-                    {/* <SelectItem value="dateCurrentMonth">Por Fecha (Mes Actual)</SelectItem> */}
                     <SelectItem value="dateSpecific">Por Fecha (Específica)</SelectItem>
-                    {/* Para rehabilitar "Por Fecha (Rango)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs: */}
-                    {/* <SelectItem value="dateRange">Por Fecha (Rango)</SelectItem> */}
+                    {isUserAdminOrRevisor && (
+                        <SelectItem value="dateCurrentMonth">Por Mes (Actual)</SelectItem>
+                    )}
+                    {isUserAdminOrRevisor && (
+                       <SelectItem value="dateRange">Por Rango de Fechas</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 {renderSearchInputs()}
@@ -1639,6 +1749,21 @@ export default function DatabasePage() {
                 </Button>
               </div>
             </form>
+
+            {duplicateFilterIds && (
+              <div className="my-4 text-center p-3 bg-primary/10 border border-primary/30 rounded-md">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setDuplicateFilterIds(null)} 
+                  className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                >
+                  <ListCollapse className="mr-2 h-4 w-4" /> Mostrar todos los resultados de la búsqueda ({fetchedSolicitudes?.length || 0})
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Actualmente viendo un conjunto específico de {duplicateFilterIds.length} solicitudes duplicadas.
+                </p>
+              </div>
+            )}
 
             {displayedSolicitudes && distinctPendingDocsCount > 5 && (
               ((user?.role === 'calificador' || user?.role === 'admin') && ( 
@@ -1704,6 +1829,7 @@ export default function DatabasePage() {
                 onOpenCommentsDialog={openCommentsDialog}
                 onDeleteSolicitud={handleDeleteSolicitudRequest} 
                 onRefreshSearch={() => handleSearch({ preserveFilters: true })}
+                onFilterByDuplicateSet={handleFilterByDuplicateSet}
                 filterRecpDocsInput={filterRecpDocsInput}
                 setFilterRecpDocsInput={setFilterRecpDocsInput}
                 filterNotMinutaInput={filterNotMinutaInput}
@@ -1809,6 +1935,19 @@ export default function DatabasePage() {
                 disabled={isPostingComment}
               />
             </div>
+            {isUserAllowedToMarkUrgent && (
+              <div className="flex items-center space-x-2 mt-2">
+                <Checkbox
+                  id="urgentCommentCheckbox"
+                  checked={isNewCommentUrgent}
+                  onCheckedChange={(checked) => setIsNewCommentUrgent(!!checked)}
+                  disabled={isPostingComment}
+                />
+                <Label htmlFor="urgentCommentCheckbox" className="text-sm font-medium text-amber-700 dark:text-amber-500 cursor-pointer">
+                  Indicar que la operación requiere atención especial
+                </Label>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeCommentsDialog} disabled={isPostingComment}>Salir</Button>
