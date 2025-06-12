@@ -28,28 +28,17 @@ const formatBooleanForExport = (value?: boolean): string => {
 };
 
 
-export function downloadTxtFile(initialContextData: Omit<InitialDataContext, 'reference'>, solicitudes: SolicitudData[]) {
+export function downloadTxtFile(initialContextData: InitialDataContext, solicitudes: SolicitudData[]) {
   const fechaSolicitud = initialContextData.date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'Fecha no especificada';
   const userName = initialContextData.manager || 'Usuario no especificado';
   const solicitudIDs = solicitudes.map(s => s.id).join(', ') || 'ninguna solicitud';
   const ne = initialContextData.ne || 'N/A';
-  // const referencia = initialContextData.reference || 'N/A'; // General reference removed
+  const referencia = initialContextData.reference || 'N/A';
 
   let content = `Buen día Contabilidad;\n${fechaSolicitud}\n\n`;
   content += `Por este medio, yo ${userName}, he generado ID de Solicitud No. (${solicitudIDs}) debidamente guardadas en CustomsFA-L, Sistema de Gestión de Pagos de ACONIC, solicito su apoyo validando la operación en su integración de sistema local, se entrega Solicitud de Cheque física firmada.\n\n`;
   content += `NE: ${ne}\n`;
-  // content += `Referencia: ${referencia}\n\n`; // General reference removed
-  if (solicitudes.some(s => s.reference)) {
-    content += `Referencias adjuntas:\n`;
-    solicitudes.forEach(s => {
-      if (s.reference) {
-        content += `- Solicitud ${s.id}: ${s.reference}\n`;
-      }
-    });
-    content += `\n`;
-  } else {
-    content += `Referencia General: N/A\n\n`;
-  }
+  content += `Referencia: ${referencia}\n\n`;
   content += `Sin más a que hacer referencia.\n\n`;
   content += `Atentamente,`;
 
@@ -99,13 +88,13 @@ export function downloadExcelFileFromTable(data: Record<string, any>[], headers:
 
 export function downloadDetailedExcelFile(data: ExportableSolicitudContextData) {
   const wb = XLSX.utils.book_new();
-  const generalInfo = data; // This is Omit<InitialDataContext, 'reference'>
+  const generalInfo = data;
   const solicitudesToExport = Array.isArray(data.solicitudes) ? data.solicitudes : [];
   let currentNumRows = 0;
 
   solicitudesToExport.forEach((solicitud, index) => {
     const sheetData: (string | number | Date | null | undefined)[][] = [];
-    currentNumRows = 0; 
+    currentNumRows = 0; // Reset for each sheet
 
     const addRow = (rowData: (string | number | Date | null | undefined)[]) => {
       sheetData.push(rowData);
@@ -128,27 +117,27 @@ export function downloadDetailedExcelFile(data: ExportableSolicitudContextData) 
     };
 
 
-    addRow(['SOLICITUD DE CHEQUE - CustomsFA-L']); 
-    addRow([]); 
+    addRow(['SOLICITUD DE CHEQUE - CustomsFA-L']); // Row 1 (index 0)
+    addRow([]); // Row 2 (index 1)
 
-    addRow(['INFORMACIÓN GENERAL:']); 
+    addRow(['INFORMACIÓN GENERAL:']); // Row 3 (index 2)
     addRow(['A (Destinatario):', generalInfo.recipient]);
     addRow(['De (Usuario):', generalInfo.manager]);
     addRow(['Fecha de Solicitud:', generalInfo.date ? format(generalInfo.date instanceof Date ? generalInfo.date : (generalInfo.date as Timestamp).toDate(), "PPP", { locale: es }) : 'N/A']);
     addRow(['NE (Tracking NX1):', generalInfo.ne]);
-    // addRow(['Referencia:', generalInfo.reference || 'N/A']); // General reference removed
-    addRow([]); 
+    addRow(['Referencia:', generalInfo.reference || 'N/A']);
+    addRow([]); // Row 9 (index 8)
 
-    addRow(['DETALLES DE LA SOLICITUD (ID: ' + solicitud.id + '):']); 
-    addRow(['Referencia Solicitud:', solicitud.reference || 'N/A']); // Added per-solicitud reference here
-    addRow([]); 
+    addRow(['DETALLES DE LA SOLICITUD (ID: ' + solicitud.id + '):']); // Row 10 (index 9)
+    addRow([]); // Row 11 (index 10)
     
-    addRow(['Por este medio me dirijo a usted para solicitarle que elabore cheque por la cantidad de:']); 
-    addRow([formatCurrencyForExportDisplay(solicitud.monto, solicitud.montoMoneda)]); 
-    addRow(['Cantidad en Letras:', solicitud.cantidadEnLetras || 'N/A']); 
-    addRow([]); 
+    // Section: Monto y Cantidad - Row 12 (index 11) starts here
+    addRow(['Por este medio me dirijo a usted para solicitarle que elabore cheque por la cantidad de:']); // Row 12 (index 11), Col A
+    addRow([formatCurrencyForExportDisplay(solicitud.monto, solicitud.montoMoneda)]); // Row 13 (index 12), Col A
+    addRow(['Cantidad en Letras:', solicitud.cantidadEnLetras || 'N/A']); // Row 14 (index 13), Col A & B
+    addRow([]); // Row 15 (index 14)
 
-    addRow(['INFORMACIÓN ADICIONAL DE SOLICITUD:']); 
+    addRow(['INFORMACIÓN ADICIONAL DE SOLICITUD:']); // Row 16
     addRow(['  Consignatario:', solicitud.consignatario || 'N/A']);
     addRow(['  Declaración Número:', solicitud.declaracionNumero || 'N/A']);
     addRow(['  Unidad Recaudadora:', solicitud.unidadRecaudadora || 'N/A']);
@@ -204,62 +193,69 @@ export function downloadDetailedExcelFile(data: ExportableSolicitudContextData) 
         addRow([]);
     }
 
-    addRow(['COMUNICACIÓN Y OBSERVACIONES:']); 
+    addRow(['COMUNICACIÓN Y OBSERVACIONES:']); // Label
     addRow(['  Correos de Notificación:', solicitud.correo || 'N/A']);
-    addRow(['  Observación:']); 
-    addRow([solicitud.observation || 'N/A']); 
+    addRow(['  Observación:']); // Label
+    addRow([solicitud.observation || 'N/A']); // Value on new line
 
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
     
     ws['!cols'] = [{wch: 39.93}, {wch: 41.86}];
-    ws['!rows'] = []; 
+    ws['!rows'] = []; // Crucial: Allow Excel to auto-adjust row heights for wrapped text
 
     let cantidadEnLetrasRowIndex = -1;
     let observacionRowIndex = -1;
 
+    // Base styling loop
     for (let r = 0; r < currentNumRows; ++r) {
-        for (let c = 0; c < 2; ++c) { 
+        for (let c = 0; c < 2; ++c) { // Iterate only columns A (0) and B (1)
             const cellAddress = XLSX.utils.encode_cell({ r, c });
             const cellValue = sheetData[r]?.[c];
 
             if (cellValue === null || cellValue === undefined || String(cellValue).trim() === '') {
-                ensureCellExists(ws, r, c, '', 's'); 
+                ensureCellExists(ws, r, c, '', 's'); // Ensure cell exists even if empty for styling
             } else {
                 ensureCellExists(ws, r, c, String(cellValue), typeof cellValue === 'number' ? 'n' : 's');
             }
 
+            // Base alignment: wrap text, vertical top, horizontal left
             ws[cellAddress].s.alignment.wrapText = true;
             ws[cellAddress].s.alignment.vertical = 'top';
             ws[cellAddress].s.alignment.horizontal = 'left';
 
 
+            // Bolding logic
             const isLabelCellInColA = c === 0 && typeof cellValue === 'string' && cellValue.endsWith(':');
             const isValueCellInColB = c === 1 && typeof sheetData[r]?.[0] === 'string' && (sheetData[r][0] as string).endsWith(':');
+            // For single values in Col A (like monto, or cantidadEnLetras/observacion values now in Col A)
             const isSingleValueInColA = c === 0 && 
                                        (sheetData[r].length === 1 || sheetData[r][1] === null || sheetData[r][1] === undefined) &&
                                        cellValue && String(cellValue).trim() !== 'N/A' && String(cellValue).trim() !== '' &&
                                        !(typeof cellValue === 'string' && cellValue === cellValue.toUpperCase() && cellValue.endsWith(':'));
 
 
-            if (isLabelCellInColA && !(typeof cellValue === 'string' && cellValue === cellValue.toUpperCase() && cellValue.endsWith(':'))) { 
+            if (isLabelCellInColA && !(typeof cellValue === 'string' && cellValue === cellValue.toUpperCase() && cellValue.endsWith(':'))) { // Non-all-caps labels
                 ws[cellAddress].s.font = { bold: true };
             } else if ((isValueCellInColB || isSingleValueInColA) && cellValue && String(cellValue).trim() !== 'N/A' && String(cellValue).trim() !== '') {
                 ws[cellAddress].s.font = { bold: true };
             }
             
+            // Find rows for specific formatting
             if (c === 0 && typeof cellValue === 'string') {
-                if (cellValue.startsWith('Cantidad en Letras:')) cantidadEnLetrasRowIndex = r; // Value is in Col B of same row
-                if (cellValue.startsWith('  Observación:')) observacionRowIndex = r + 1; 
+                if (cellValue.startsWith('Cantidad en Letras:')) cantidadEnLetrasRowIndex = r + 1; // Value is on next row in Col A
+                if (cellValue.startsWith('  Observación:')) observacionRowIndex = r + 1; // Value is on next row in Col A
             }
         }
     }
     
+    // Main Title Styling
     const mainTitleCell = ensureCellExists(ws, 0, 0);
     mainTitleCell.s.font = { name: 'Calibri', sz: 14, bold: true };
     mainTitleCell.s.alignment.horizontal = 'center';
     if (!ws['!merges']) ws['!merges'] = [];
     ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } });
 
+    // Section Headers Styling (e.g., "INFORMACIÓN GENERAL:")
     sheetData.forEach((row, rIndex) => {
       if (row.length === 1 && typeof row[0] === 'string' && row[0] === row[0].toUpperCase() && row[0].endsWith(':')) {
         const sectionHeaderCell = ensureCellExists(ws, rIndex, 0);
@@ -270,12 +266,16 @@ export function downloadDetailedExcelFile(data: ExportableSolicitudContextData) 
       }
     });
 
+    // Specific styling for "Cantidad en Letras" value (now in Col A)
     if (cantidadEnLetrasRowIndex !== -1 && cantidadEnLetrasRowIndex < currentNumRows) {
-        const cellAddr = XLSX.utils.encode_cell({ r: cantidadEnLetrasRowIndex, c: 1 }); // Value is in column B
-        if (ws[cellAddr] && ws[cellAddr].v && String(ws[cellAddr].v).trim() !== 'N/A' && String(ws[cellAddr].v).trim() !== '') {
+        const cellAddr = XLSX.utils.encode_cell({ r: cantidadEnLetrasRowIndex, c: 0 });
+        ensureCellExists(ws, cantidadEnLetrasRowIndex, 0, sheetData[cantidadEnLetrasRowIndex][0], 's');
+        ws[cellAddr].s.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' }; // Was justify, changed to left
+        if (ws[cellAddr].v && String(ws[cellAddr].v).trim() !== 'N/A' && String(ws[cellAddr].v).trim() !== '') {
              ws[cellAddr].s.font = { ...ws[cellAddr].s.font, bold: true };
         }
     }
+    // Specific styling for "Observación" value (now in Col A)
     if (observacionRowIndex !== -1 && observacionRowIndex < currentNumRows) {
         const cellAddr = XLSX.utils.encode_cell({ r: observacionRowIndex, c: 0 });
         ensureCellExists(ws, observacionRowIndex, 0, sheetData[observacionRowIndex][0], 's');
@@ -287,7 +287,7 @@ export function downloadDetailedExcelFile(data: ExportableSolicitudContextData) 
 
 
     if (!ws['!printSetup']) ws['!printSetup'] = {};
-    ws['!printSetup'].paperSize = 9; 
+    ws['!printSetup'].paperSize = 9; // US Letter
     ws['!printSetup'].orientation = 'portrait';
     ws['!printSetup'].printArea = `A1:B${Math.min(currentNumRows, 50)}`; 
     ws['!printSetup'].fitToWidth = 1;
