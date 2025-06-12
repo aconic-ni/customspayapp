@@ -1,118 +1,204 @@
 
 "use client";
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { useAppContext } from '@/context/AppContext';
-import type { SolicitudData } from '@/types';
-import { Eye, Edit3, Trash2, MoreHorizontal, FileText, AlertTriangle, Info, CalendarDays } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-// useRouter is no longer needed for the "Ver" action here
+import type React from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import type { InitialDataContext, SolicitudData, AppUser as AuthAppUser } from '@/types';
+import { useAuth } from './AuthContext';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
-export function ProductTable() {
-  const { initialContextData, solicitudes, openAddProductModal, deleteSolicitud, setSolicitudToViewInline } = useAppContext();
+export enum SolicitudStep {
+  INITIAL_DATA = 1,
+  PRODUCT_LIST = 2,
+  PREVIEW = 3,
+  SUCCESS = 4,
+}
 
-  const formatCurrency = (amount?: number | string, currency?: string) => {
-    if (amount === undefined || amount === null || amount === '') return 'N/A';
-    const num = Number(amount);
-    if (isNaN(num)) return 'Inválido';
+interface AppContextType {
+  initialContextData: InitialDataContext | null;
+  solicitudes: SolicitudData[];
+  currentStep: SolicitudStep;
+  editingSolicitud: SolicitudData | null;
+  isAddProductModalOpen: boolean;
+  setInitialContextData: (data: InitialDataContext) => void;
+  addSolicitud: (solicitudData: Omit<SolicitudData, 'id'>) => void;
+  updateSolicitud: (updatedSolicitud: SolicitudData) => void;
+  deleteSolicitud: (solicitudId: string) => void;
+  setCurrentStep: (step: SolicitudStep) => void;
+  setEditingSolicitud: (solicitud: SolicitudData | null) => void;
+  openAddProductModal: (solicitudToEdit?: SolicitudData | null) => void;
+  closeAddProductModal: () => void;
+  resetApp: () => void;
 
-    let prefix = '';
-    if (currency === 'cordoba') prefix = 'C$';
-    else if (currency === 'dolar') prefix = 'US$';
-    else if (currency === 'euro') prefix = '€';
+  // New state for inline detail view
+  solicitudToViewInline: SolicitudData | null;
+  setSolicitudToViewInline: (solicitud: SolicitudData | null) => void;
+  isDetailViewInlineVisible: boolean;
+  setIsDetailViewInlineVisible: (isVisible: boolean) => void;
+}
 
-    return `${prefix}${num.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+const AppContext = createContext<AppContextType | undefined>(undefined);
 
-  const renderStatusBadges = (solicitud: SolicitudData) => {
-    const badges = [];
-    if (solicitud.documentosAdjuntos) badges.push(<Badge key="docs" variant="outline" className="bg-blue-100 text-blue-800 whitespace-nowrap flex items-center"><FileText className="h-3 w-3 mr-1" /> Docs</Badge>);
-    if (solicitud.soporte) badges.push(<Badge key="soporte" variant="outline" className="bg-orange-100 text-orange-800 whitespace-nowrap flex items-center"><AlertTriangle className="h-3 w-3 mr-1"/> Soporte</Badge>);
-    if (solicitud.impuestosPendientesCliente) badges.push(<Badge key="impuestos" variant="outline" className="bg-orange-100 text-orange-800 whitespace-nowrap flex items-center"><AlertTriangle className="h-3 w-3 mr-1"/> Imp. Pend.</Badge>);
-    if (solicitud.constanciasNoRetencion) badges.push(<Badge key="retencion" variant="outline" className="bg-purple-100 text-purple-800 whitespace-nowrap flex items-center"><FileText className="h-3 w-3 mr-1" /> No Ret.</Badge>);
+export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [initialContextData, setInitialContextDataState] = useState<InitialDataContext | null>(null);
+  const [solicitudes, setSolicitudes] = useState<SolicitudData[]>([]);
+  const [currentStep, setCurrentStepState] = useState<SolicitudStep>(SolicitudStep.INITIAL_DATA);
+  const [editingSolicitud, setEditingSolicitudState] = useState<SolicitudData | null>(null);
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
 
-    if (badges.length === 0) {
-      return <Badge variant="outline">Sin Estados</Badge>;
+  // New state for inline detail view
+  const [solicitudToViewInline, setSolicitudToViewInlineState] = useState<SolicitudData | null>(null);
+  const [isDetailViewInlineVisible, setIsDetailViewInlineVisibleState] = useState<boolean>(false);
+
+  const { toast } = useToast(); // Initialize useToast
+  const { user: authUser } = useAuth();
+  const [internalUser, setInternalUser] = useState<AuthAppUser | null>(authUser);
+
+  const resetApp = useCallback(() => {
+    setInitialContextDataState(null);
+    setSolicitudes([]);
+    setCurrentStepState(SolicitudStep.INITIAL_DATA);
+    setEditingSolicitudState(null);
+    setIsAddProductModalOpen(false);
+    setSolicitudToViewInlineState(null); // Reset inline view state
+    setIsDetailViewInlineVisibleState(false); // Reset inline view visibility
+  }, []);
+
+
+  useEffect(() => {
+    const authUserChanged = authUser?.uid !== internalUser?.uid ||
+                           (authUser && !internalUser) ||
+                           (!authUser && internalUser);
+
+    if (authUserChanged) {
+      resetApp();
+      setInternalUser(authUser);
     }
-    return <div className="flex flex-wrap gap-1">{badges}</div>;
-  };
+  }, [authUser, internalUser, resetApp]);
 
 
-  if (solicitudes.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        No hay solicitudes añadidas. Haga clic en &quot;Añadir Nueva Solicitud&quot; para comenzar.
-      </div>
+  const setInitialContextData = useCallback((data: InitialDataContext) => {
+    setInitialContextDataState(prevData => ({ ...prevData, ...data }));
+  }, []);
+
+  const addSolicitud = useCallback((solicitudData: Omit<SolicitudData, 'id'>) => {
+    if (!initialContextData || !initialContextData.ne) {
+      console.error("NE from initialContextData is missing. Cannot generate Solicitud ID.");
+      toast({
+        title: "Error al añadir",
+        description: "Falta el NE en los datos iniciales para generar el ID de la solicitud.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const now = new Date();
+    const datePart = format(now, 'yyyyMMdd');
+    const timePart = format(now, 'HHmmss');
+    const newId = `${initialContextData.ne}-${datePart}-${timePart}`;
+
+    const newSolicitud: SolicitudData = { ...solicitudData, id: newId };
+    setSolicitudes((prevSolicitudes) => [...prevSolicitudes, newSolicitud]);
+    toast({
+      title: "Solicitud Añadida",
+      description: `La solicitud con ID ${newId} ha sido añadida a la lista.`,
+    });
+  }, [initialContextData, toast]);
+
+  const updateSolicitud = useCallback((updatedSolicitud: SolicitudData) => {
+    setSolicitudes((prevSolicitudes) =>
+      prevSolicitudes.map((s) => (s.id === updatedSolicitud.id ? updatedSolicitud : s))
     );
-  }
+    setEditingSolicitudState(null);
+    toast({
+      title: "Solicitud Actualizada",
+      description: `La solicitud con ID ${updatedSolicitud.id} ha sido actualizada.`,
+    });
+  }, [toast]);
+
+  const deleteSolicitud = useCallback((solicitudId: string) => {
+    setSolicitudes((prevSolicitudes) => prevSolicitudes.filter((s) => s.id !== solicitudId));
+    // If the deleted solicitud was being viewed inline, hide the detail view
+    if (solicitudToViewInline?.id === solicitudId) {
+      setIsDetailViewInlineVisibleState(false);
+      setSolicitudToViewInlineState(null);
+    }
+    toast({
+      title: "Solicitud Eliminada",
+      description: `La solicitud con ID ${solicitudId} ha sido eliminada de la lista.`,
+    });
+  }, [solicitudToViewInline, toast]);
+
+  const setCurrentStep = useCallback((step: SolicitudStep) => {
+    setCurrentStepState(step);
+     // When navigating away from product list, hide inline detail
+    if (step !== SolicitudStep.PRODUCT_LIST) {
+      setIsDetailViewInlineVisibleState(false);
+      setSolicitudToViewInlineState(null);
+    }
+  }, []);
+
+  const setEditingSolicitud = useCallback((solicitud: SolicitudData | null) => {
+    setEditingSolicitudState(solicitud);
+  }, []);
+
+  const openAddProductModal = useCallback((solicitudToEdit: SolicitudData | null = null) => {
+    setEditingSolicitudState(solicitudToEdit);
+    setIsAddProductModalOpen(true);
+    setIsDetailViewInlineVisibleState(false); // Hide detail view when opening modal
+    setSolicitudToViewInlineState(null);
+  }, []);
+
+  const closeAddProductModal = useCallback(() => {
+    setIsAddProductModalOpen(false);
+    setTimeout(() => setEditingSolicitudState(null), 150);
+  }, []);
+
+  // New setters for inline detail view
+  const setSolicitudToViewInline = useCallback((solicitud: SolicitudData | null) => {
+    setSolicitudToViewInlineState(solicitud);
+    setIsDetailViewInlineVisibleState(!!solicitud); 
+  }, []);
+
+  const setIsDetailViewInlineVisible = useCallback((isVisible: boolean) => {
+    setIsDetailViewInlineVisibleState(isVisible);
+    if (!isVisible) {
+      setSolicitudToViewInlineState(null); 
+    }
+  }, []);
+
 
   return (
-    <div className="overflow-x-auto table-container rounded-lg border">
-      <Table>
-        <TableHeader className="bg-secondary/50">
-          <TableRow>
-            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider min-w-[150px]">
-              <Info className="inline-block h-3.5 w-3.5 mr-1 align-middle" />
-              Estado
-            </TableHead>
-            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-              ID Solicitud
-            </TableHead>
-            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-              <CalendarDays className="inline-block h-3.5 w-3.5 mr-1 align-middle" />
-              Fecha de Solicitud
-            </TableHead>
-            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">NE</TableHead>
-            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Monto</TableHead>
-            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Consignatario</TableHead>
-            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Declaracion</TableHead>
-            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className="bg-card divide-y divide-border">
-          {solicitudes.map((solicitud) => (
-            <TableRow key={solicitud.id} className="hover:bg-muted/50">
-              <TableCell className="px-4 py-3 text-sm text-muted-foreground">{renderStatusBadges(solicitud)}</TableCell>
-              <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{solicitud.id}</TableCell>
-              <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                {initialContextData?.date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'N/A'}
-              </TableCell>
-              <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{initialContextData?.ne || 'N/A'}</TableCell>
-              <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{formatCurrency(solicitud.monto, solicitud.montoMoneda)}</TableCell>
-              <TableCell className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">{solicitud.consignatario || 'N/A'}</TableCell>
-              <TableCell className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">{solicitud.declaracionNumero || 'N/A'}</TableCell>
-              <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Abrir menú</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setSolicitudToViewInline(solicitud)}>
-                      <Eye className="mr-2 h-4 w-4" /> Ver Detalle
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openAddProductModal(solicitud)}>
-                      <Edit3 className="mr-2 h-4 w-4" /> Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {
-                      if (confirm('¿Está seguro de que desea eliminar esta solicitud?')) {
-                        deleteSolicitud(solicitud.id);
-                      }
-                    }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <AppContext.Provider
+      value={{
+        initialContextData,
+        solicitudes,
+        currentStep,
+        editingSolicitud,
+        isAddProductModalOpen,
+        setInitialContextData,
+        addSolicitud,
+        updateSolicitud,
+        deleteSolicitud,
+        setCurrentStep,
+        setEditingSolicitud,
+        openAddProductModal,
+        closeAddProductModal,
+        resetApp,
+        solicitudToViewInline,
+        setSolicitudToViewInline,
+        isDetailViewInlineVisible,
+        setIsDetailViewInlineVisible,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
   );
-}
+};
+
+export const useAppContext = (): AppContextType => {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useAppContext must be used within an AppProvider');
+  }
+  return context;
+};
