@@ -179,15 +179,18 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   if (!solicitudes || solicitudes.length === 0) {
     let message = "No se encontraron solicitudes para los criterios ingresados.";
     if (searchType === "dateToday") message = "No se encontraron solicitudes para hoy."
-    // else if (searchType === "dateCurrentMonth") message = `No se encontraron solicitudes para ${searchTerm}.` // Temporarily commented
+    // Para rehabilitar "Por Fecha (Mes Actual)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs:
+    // else if (searchType === "dateCurrentMonth") message = `No se encontraron solicitudes para ${searchTerm}.`
     return <p className="text-muted-foreground text-center py-4">{message}</p>;
   }
 
   const getTitle = () => {
     if (searchType === "dateToday") return `Solicitudes de Hoy (${format(new Date(), "PPP", { locale: es })})`;
-    // if (searchType === "dateCurrentMonth") return `Solicitudes de ${searchTerm}`; // Temporarily commented
+    // Para rehabilitar "Por Fecha (Mes Actual)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs:
+    // if (searchType === "dateCurrentMonth") return `Solicitudes de ${searchTerm}`;
     if (searchType === "dateSpecific" && searchTerm) return `Solicitudes del ${searchTerm}`;
-    if (searchType === "dateRange" && searchTerm) return `Solicitudes para el rango: ${searchTerm}`;
+    // Para rehabilitar "Por Fecha (Rango)", descomente la siguiente línea y la lógica en handleSearch y renderSearchInputs:
+    // if (searchType === "dateRange" && searchTerm) return `Solicitudes para el rango: ${searchTerm}`;
     return "Solicitudes Encontradas";
   };
 
@@ -743,7 +746,8 @@ export default function DatabasePage() {
 
   const fetchPermanentlyResolvedKeys = useCallback(async () => {
     const rolesThatNeedValidations = ['revisor', 'calificador', 'admin'];
-    if (!user || !user.role || !rolesThatNeedValidations.includes(user.role)) {
+    // Exclude autorevisor_plus from fetching these as they don't interact with this system part
+    if (!user || !user.role || !rolesThatNeedValidations.includes(user.role) || user.role === 'autorevisor_plus') {
       setIsLoadingPermanentlyResolvedKeys(false);
       return;
     }
@@ -841,17 +845,11 @@ export default function DatabasePage() {
         (s.examReference || '').toLowerCase().includes(term)
     );
 
-    // Client-side 'Guardado Por' filter is now primarily for non-autorevisor roles,
-    // as autorevisor and autorevisor_plus filtering is handled by Firestore query.
-    // This client filter acts as a secondary refinement if filterGuardadoPorInput is used.
     if (user?.role !== 'autorevisor' && user?.role !== 'autorevisor_plus') {
       accumulatedData = applyFilter(accumulatedData, filterGuardadoPorInput, (s, term) =>
         (s.savedBy || '').toLowerCase().includes(term)
       );
     }
-    // If 'autorevisor' or 'autorevisor_plus' and filterGuardadoPorInput is somehow populated (e.g. from old state),
-    // it might further filter, but the primary filter is the Firestore query.
-
     return accumulatedData;
   }, [
     fetchedSolicitudes,
@@ -866,13 +864,12 @@ export default function DatabasePage() {
     filterConsignatarioInput,
     filterDeclaracionInput,
     filterReferenciaInput,
-    filterGuardadoPorInput, // Keep this in dependencies
+    filterGuardadoPorInput,
     user?.role,
-    // user?.email // Email is not directly used in this memo logic anymore for autorevisors
   ]);
 
   useEffect(() => {
-    if (displayedSolicitudes && (user?.role === 'calificador' || user?.role === 'revisor' || user?.role === 'admin' || user?.role === 'autorevisor_plus')) {
+    if (displayedSolicitudes && (user?.role === 'calificador' || user?.role === 'revisor' || user?.role === 'admin' || (user?.role === 'autorevisor_plus' && user.canReviewUserEmails && user.canReviewUserEmails.length > 0))) {
       let paymentPend = 0;
       let recpDocsPend = 0;
       let notMinutaPend = 0;
@@ -905,7 +902,7 @@ export default function DatabasePage() {
       setPendingNotMinutaCount(0);
       setDistinctPendingDocsCount(0);
     }
-  }, [displayedSolicitudes, user?.role]);
+  }, [displayedSolicitudes, user?.role, user?.canReviewUserEmails]);
 
 
   const handleUpdatePaymentStatus = useCallback(async (solicitudId: string, newPaymentStatus: string | null) => {
@@ -1183,16 +1180,15 @@ export default function DatabasePage() {
   }, [user, authLoading, router, isClient, fetchedSolicitudes, isDetailViewVisible]);
 
   useEffect(() => {
-    // For 'autorevisor' and 'autorevisor_plus', the filter input is based on their role's data scope.
-    // 'autorevisor' sees own email. 'autorevisor_plus' sees own and colleague's (this part is for display hint only).
     if (isClient && !authLoading && user?.email) {
       if (user.role === 'autorevisor') {
         setFilterGuardadoPorInput(user.email);
       } else if (user.role === 'autorevisor_plus') {
-        const colleagueEmail = user.canReviewUserEmail ? `, ${user.canReviewUserEmail}` : '';
-        setFilterGuardadoPorInput(`${user.email}${colleagueEmail}`); // Display both, but it's read-only
+        const colleagueEmails = user.canReviewUserEmails && user.canReviewUserEmails.length > 0 
+          ? `, ${user.canReviewUserEmails.join(', ')}` 
+          : '';
+        setFilterGuardadoPorInput(`${user.email}${colleagueEmails}`);
       }
-      // For other roles, input is user-editable and might be cleared or not based on other logic.
     }
   }, [isClient, authLoading, user]);
 
@@ -1237,18 +1233,18 @@ export default function DatabasePage() {
     let termForDisplay = searchTermText.trim();
     const queryConstraints: QueryConstraint[] = [];
 
-    // Always order by examDate descending
     queryConstraints.push(orderBy("examDate", "desc"));
 
-    // Filter by 'savedBy' based on role
     if (user?.email) {
       if (user.role === 'autorevisor') {
         queryConstraints.push(where("savedBy", "==", user.email));
-      } else if (user.role === 'autorevisor_plus' && user.canReviewUserEmail) {
-        queryConstraints.push(where("savedBy", "in", [user.email, user.canReviewUserEmail]));
+      } else if (user.role === 'autorevisor_plus' && user.canReviewUserEmails && user.canReviewUserEmails.length > 0) {
+        const emailsToQuery = [user.email, ...user.canReviewUserEmails];
+        queryConstraints.push(where("savedBy", "in", emailsToQuery));
+      } else if (user.role === 'autorevisor_plus' && (!user.canReviewUserEmails || user.canReviewUserEmails.length === 0)) {
+        // Autorevisor_plus with no colleagues assigned, only query their own
+        queryConstraints.push(where("savedBy", "==", user.email));
       }
-      // For other roles (revisor, calificador, admin), no 'savedBy' filter is applied here,
-      // allowing them to see all records based on date criteria, then filter client-side if needed.
     }
 
 
@@ -1261,13 +1257,15 @@ export default function DatabasePage() {
           queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(todayEnd)));
           termForDisplay = format(new Date(), "PPP", { locale: es });
           break;
-        case "dateCurrentMonth": // Temporarily commented out
+        case "dateCurrentMonth":
+          // Para rehabilitar, descomente la lógica y quite el error.
+          setError("Búsqueda por mes actual está temporalmente deshabilitada."); setIsLoading(false); return;
           // const currentMonthStart = startOfMonth(new Date());
           // const currentMonthEnd = endOfMonth(new Date());
           // queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(currentMonthStart)));
           // queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(currentMonthEnd)));
           // termForDisplay = format(new Date(), "MMMM yyyy", { locale: es });
-          setError("Búsqueda por mes actual está temporalmente deshabilitada."); setIsLoading(false); return; // Prevent execution for this case
+          // break;
         case "dateSpecific":
           if (!selectedDate) { setError("Por favor, seleccione una fecha específica."); setIsLoading(false); return; }
           const specificDayStart = startOfDay(selectedDate);
@@ -1276,7 +1274,9 @@ export default function DatabasePage() {
           queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(specificDayEnd)));
           termForDisplay = format(selectedDate, "PPP", { locale: es });
           break;
-        case "dateRange": // Temporarily commented out
+        case "dateRange":
+          // Para rehabilitar, descomente la lógica y quite el error.
+          setError("Búsqueda por rango de fechas está temporalmente deshabilitada."); setIsLoading(false); return;
           // if (!datePickerStartDate || !datePickerEndDate) { setError("Por favor, seleccione una fecha de inicio y fin para el rango."); setIsLoading(false); return; }
           // if (datePickerEndDate < datePickerStartDate) { setError("La fecha de fin no puede ser anterior a la fecha de inicio."); setIsLoading(false); return; }
           // const rangeStart = startOfDay(datePickerStartDate);
@@ -1284,7 +1284,7 @@ export default function DatabasePage() {
           // queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(rangeStart)));
           // queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(rangeEnd)));
           // termForDisplay = `${format(datePickerStartDate, "P", { locale: es })} - ${format(datePickerEndDate, "P", { locale: es })}`;
-          setError("Búsqueda por rango de fechas está temporalmente deshabilitada."); setIsLoading(false); return; // Prevent execution for this case
+          // break;
         default:
           setError("Tipo de búsqueda no válido."); setIsLoading(false); return;
       }
@@ -1526,7 +1526,8 @@ export default function DatabasePage() {
   const renderSearchInputs = () => {
     switch (searchType) {
       case "dateToday": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes de hoy.</p>;
-      // case "dateCurrentMonth": return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes del mes actual.</p>; // Para rehabilitar, descomente esta línea y la correspondiente en el Select.
+      // case "dateCurrentMonth": // Para rehabilitar, descomente esta línea y la lógica en handleSearch.
+      //  return <p className="text-sm text-muted-foreground flex-grow items-center flex h-10">Se buscarán las solicitudes del mes actual.</p>;
       case "dateSpecific":
         return (
           <Popover open={isSpecificDatePopoverOpen} onOpenChange={setIsSpecificDatePopoverOpen}>
@@ -1545,7 +1546,7 @@ export default function DatabasePage() {
             </PopoverContent>
           </Popover>
         );
-      // case "dateRange": // Para rehabilitar, descomente esta sección y la correspondiente en el Select.
+      // case "dateRange": // Para rehabilitar, descomente esta sección y la lógica en handleSearch.
       //   return (
       //     <div className="flex flex-col sm:flex-row gap-2 flex-grow">
       //       <Popover open={isStartDatePopoverOpen} onOpenChange={setIsStartDatePopoverOpen}>
@@ -1662,7 +1663,7 @@ export default function DatabasePage() {
                   </CardContent>
                 </Card>
               )) ||
-              (((user?.role === 'revisor') || (user?.role === 'autorevisor_plus' && user?.canReviewUserEmail)) && ( // Revisor and autorevisor_plus (who can review others) see this alert
+              (((user?.role === 'revisor') || (user?.role === 'autorevisor_plus' && user.canReviewUserEmails && user.canReviewUserEmails.length > 0)) && ( 
                 <Card className="mt-4 mb-6 bg-sky-50 border border-sky-300 custom-shadow">
                   <CardHeader className="pb-3 pt-4">
                     <CardTitle className="text-lg text-sky-800 flex items-center">
