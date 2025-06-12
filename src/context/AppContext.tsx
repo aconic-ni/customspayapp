@@ -5,7 +5,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import type { InitialDataContext, SolicitudData, AppUser as AuthAppUser } from '@/types';
 import { useAuth } from './AuthContext';
 import { format } from 'date-fns';
-import { useToast } from "@/hooks/use-toast"; 
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 export enum SolicitudStep {
   INITIAL_DATA = 1,
@@ -15,12 +15,12 @@ export enum SolicitudStep {
 }
 
 interface AppContextType {
-  initialContextData: Omit<InitialDataContext, 'reference'> | null;
+  initialContextData: InitialDataContext | null;
   solicitudes: SolicitudData[];
   currentStep: SolicitudStep;
   editingSolicitud: SolicitudData | null;
   isAddProductModalOpen: boolean;
-  setInitialContextData: (data: Omit<InitialDataContext, 'reference'>) => void;
+  setInitialContextData: (data: InitialDataContext) => void;
   addSolicitud: (solicitudData: Omit<SolicitudData, 'id'>) => void;
   updateSolicitud: (updatedSolicitud: SolicitudData) => void;
   deleteSolicitud: (solicitudId: string) => void;
@@ -29,6 +29,8 @@ interface AppContextType {
   openAddProductModal: (solicitudToEdit?: SolicitudData | null) => void;
   closeAddProductModal: () => void;
   resetApp: () => void;
+
+  // New state for inline detail view
   solicitudToViewInline: SolicitudData | null;
   setSolicitudToViewInline: (solicitud: SolicitudData | null) => void;
   isDetailViewInlineVisible: boolean;
@@ -38,14 +40,17 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [initialContextData, setInitialContextDataState] = useState<Omit<InitialDataContext, 'reference'> | null>(null);
+  const [initialContextData, setInitialContextDataState] = useState<InitialDataContext | null>(null);
   const [solicitudes, setSolicitudes] = useState<SolicitudData[]>([]);
   const [currentStep, setCurrentStepState] = useState<SolicitudStep>(SolicitudStep.INITIAL_DATA);
   const [editingSolicitud, setEditingSolicitudState] = useState<SolicitudData | null>(null);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
+
+  // New state for inline detail view
   const [solicitudToViewInline, setSolicitudToViewInlineState] = useState<SolicitudData | null>(null);
   const [isDetailViewInlineVisible, setIsDetailViewInlineVisibleState] = useState<boolean>(false);
-  const { toast } = useToast(); 
+
+  const { toast } = useToast(); // Initialize useToast
   const { user: authUser } = useAuth();
   const [internalUser, setInternalUser] = useState<AuthAppUser | null>(authUser);
 
@@ -55,8 +60,8 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
     setCurrentStepState(SolicitudStep.INITIAL_DATA);
     setEditingSolicitudState(null);
     setIsAddProductModalOpen(false);
-    setSolicitudToViewInlineState(null); 
-    setIsDetailViewInlineVisibleState(false); 
+    setSolicitudToViewInlineState(null); // Reset inline view state
+    setIsDetailViewInlineVisibleState(false); // Reset inline view visibility
   }, []);
 
 
@@ -72,7 +77,7 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
   }, [authUser, internalUser, resetApp]);
 
 
-  const setInitialContextData = useCallback((data: Omit<InitialDataContext, 'reference'>) => {
+  const setInitialContextData = useCallback((data: InitialDataContext) => {
     setInitialContextDataState(prevData => ({ ...prevData, ...data }));
   }, []);
 
@@ -111,24 +116,8 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
   }, [toast]);
 
   const deleteSolicitud = useCallback((solicitudId: string) => {
-    console.log(`[AppContext] DELETE: Attempting to delete solicitud with ID: ${solicitudId}`);
-    console.log('[AppContext] DELETE: Solicitudes BEFORE deletion:', JSON.stringify(solicitudes));
-
-    const updatedSolicitudes = solicitudes.filter((s) => {
-      // console.log(`[AppContext] DELETE: Comparing ${s.id} with ${solicitudId}. Match: ${s.id === solicitudId}`);
-      return s.id !== solicitudId;
-    });
-    
-    console.log('[AppContext] DELETE: Solicitudes AFTER filtering:', JSON.stringify(updatedSolicitudes));
-    
-    if (solicitudes.length === updatedSolicitudes.length) {
-        console.warn(`[AppContext] DELETE: Solicitud ID ${solicitudId} NOT FOUND in current list. No change made.`);
-    } else {
-        console.log(`[AppContext] DELETE: Solicitud ID ${solicitudId} found and removed. Updating state.`);
-    }
-
-    setSolicitudes(updatedSolicitudes);
-
+    setSolicitudes((prevSolicitudes) => prevSolicitudes.filter((s) => s.id !== solicitudId));
+    // If the deleted solicitud was being viewed inline, hide the detail view
     if (solicitudToViewInline?.id === solicitudId) {
       setIsDetailViewInlineVisibleState(false);
       setSolicitudToViewInlineState(null);
@@ -137,16 +126,16 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
       title: "Solicitud Eliminada",
       description: `La solicitud con ID ${solicitudId} ha sido eliminada de la lista.`,
     });
-  }, [solicitudes, solicitudToViewInline, toast, setIsDetailViewInlineVisibleState, setSolicitudToViewInlineState]);
-
+  }, [solicitudToViewInline, toast]);
 
   const setCurrentStep = useCallback((step: SolicitudStep) => {
     setCurrentStepState(step);
+     // When navigating away from product list, hide inline detail
     if (step !== SolicitudStep.PRODUCT_LIST) {
       setIsDetailViewInlineVisibleState(false);
       setSolicitudToViewInlineState(null);
     }
-  }, [setIsDetailViewInlineVisibleState, setSolicitudToViewInlineState]);
+  }, []);
 
   const setEditingSolicitud = useCallback((solicitud: SolicitudData | null) => {
     setEditingSolicitudState(solicitud);
@@ -155,26 +144,27 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
   const openAddProductModal = useCallback((solicitudToEdit: SolicitudData | null = null) => {
     setEditingSolicitudState(solicitudToEdit);
     setIsAddProductModalOpen(true);
-    setIsDetailViewInlineVisibleState(false); 
+    setIsDetailViewInlineVisibleState(false); // Hide detail view when opening modal
     setSolicitudToViewInlineState(null);
-  }, [setIsDetailViewInlineVisibleState, setSolicitudToViewInlineState]);
+  }, []);
 
   const closeAddProductModal = useCallback(() => {
     setIsAddProductModalOpen(false);
     setTimeout(() => setEditingSolicitudState(null), 150);
   }, []);
 
+  // New setters for inline detail view
   const setSolicitudToViewInline = useCallback((solicitud: SolicitudData | null) => {
     setSolicitudToViewInlineState(solicitud);
     setIsDetailViewInlineVisibleState(!!solicitud); 
-  }, [setIsDetailViewInlineVisibleState]);
+  }, []);
 
   const setIsDetailViewInlineVisible = useCallback((isVisible: boolean) => {
     setIsDetailViewInlineVisibleState(isVisible);
     if (!isVisible) {
       setSolicitudToViewInlineState(null); 
     }
-  }, [setSolicitudToViewInlineState]);
+  }, []);
 
 
   return (
@@ -211,4 +201,3 @@ export const useAppContext = (): AppContextType => {
     throw new Error('useAppContext must be used within an AppProvider');
   }
   return context;
-};
