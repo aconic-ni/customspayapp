@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       if (firebaseUser) {
         let userRole: string | undefined = undefined;
         let originalRoleFromDb: string | undefined = undefined;
-        let canReviewUserEmail: string | undefined = undefined; // For autorevisor_plus
+        let canReviewUserEmails: string[] | undefined = undefined; // Changed from canReviewUserEmail
         try {
           const userRoleDocRef = doc(db, "userRoles", firebaseUser.uid);
           const userRoleSnap = await getDoc(userRoleDocRef);
@@ -43,8 +43,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
             if (originalRoleFromDb) {
               userRole = originalRoleFromDb.trim().toLowerCase(); // Normalize role
             }
-            canReviewUserEmail = roleData?.canReviewUserEmail as string | undefined; // Fetch colleague's email
-            console.log(`Role for ${firebaseUser.email}: ${userRole} (Original from DB: "${originalRoleFromDb}"), Can Review: ${canReviewUserEmail || 'N/A'}`);
+            // Fetch canReviewUserEmails as an array
+            if (Array.isArray(roleData?.canReviewUserEmails)) {
+              canReviewUserEmails = roleData.canReviewUserEmails.filter(email => typeof email === 'string' && email.trim() !== '');
+            } else if (typeof roleData?.canReviewUserEmails === 'string' && roleData.canReviewUserEmails.trim() !== '') {
+              // Handle legacy string by converting to array (optional, good for transition)
+              canReviewUserEmails = [roleData.canReviewUserEmails.trim()];
+            }
+            console.log(`Role for ${firebaseUser.email}: ${userRole} (Original from DB: "${originalRoleFromDb}"), Can Review Emails: ${canReviewUserEmails?.join(', ') || 'N/A'}`);
           } else {
             console.log(`No role document found for ${firebaseUser.email}`);
           }
@@ -57,7 +63,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           role: userRole,
-          canReviewUserEmail: canReviewUserEmail, // Store it in the user object
+          canReviewUserEmails: canReviewUserEmails, // Store the array
         });
       } else {
         setUser(null); 
