@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { SolicitudRecord, InitialDataContext } from '@/types'; // InitialDataContext might not be needed here anymore for 'reference'
+import type { SolicitudRecord, InitialDataContext } from '@/types';
 import { Loader2, ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -72,7 +72,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
 
             setSolicitud({
               examNe: data.examNe || '',
-              examReference: data.examReference || null, // This now holds the per-solicitud reference
+              examReference: data.examReference || null,
               examManager: data.examManager || '',
               examDate: examDate,
               examRecipient: data.examRecipient || '',
@@ -182,7 +182,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     manager: solicitud.examManager,
     date: solicitud.examDate,
     ne: solicitud.examNe,
-    reference: solicitud.examReference || undefined, // Use per-solicitud reference, ensure undefined if null
+    reference: solicitud.examReference || undefined, 
   };
 
   return (
