@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { doc, setDoc, Timestamp as FirestoreTimestamp } from "firebase/firestore"; 
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import type { SolicitudRecord } from '@/types';
+import type { SolicitudRecord, InitialDataContext } from '@/types'; // Added InitialDataContext
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
@@ -62,7 +62,7 @@ export function SuccessModal() {
 
         const dataToSave: Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt' | 'recepcionDCLastUpdatedAt' | 'emailMinutaLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp | null, recepcionDCLastUpdatedAt?: FirestoreTimestamp | null, emailMinutaLastUpdatedAt?: FirestoreTimestamp | null } = {
           examNe: initialContextData.ne,
-          examReference: initialContextData.reference || null,
+          examReference: solicitud.reference || null, // Use per-solicitud reference
           examManager: initialContextData.manager,
           examDate: FirestoreTimestamp.fromDate(initialContextData.date), 
           examRecipient: initialContextData.recipient,
@@ -119,6 +119,7 @@ export function SuccessModal() {
           emailMinutaLastUpdatedBy: null,
           emailMinutaLastUpdatedAt: null,
           commentsCount: 0,
+          hasOpenUrgentComment: false, // Default to false on new save
         };
 
         const solicitudDocRef = doc(db, "SolicitudCheques", solicitud.id);
@@ -166,12 +167,23 @@ export function SuccessModal() {
     const userName = initialContextData.manager || 'Usuario no especificado';
     const solicitudIDs = solicitudes.map(s => s.id).join(', ') || 'ninguna solicitud';
     const ne = initialContextData.ne || 'N/A';
-    const referencia = initialContextData.reference || 'N/A';
+    // const referencia = initialContextData.reference || 'N/A'; // General reference removed
 
     let cuerpo = `Buen día Contabilidad;\n${fechaSolicitud}\n\n`;
     cuerpo += `Por este medio, yo ${userName}, he generado ID de Solicitud No. (${solicitudIDs}) debidamente guardadas en CustomsFA-L, Sistema de Gestión de Pagos de ACONIC, solicito su apoyo validando la operación en su integración de sistema local, se entrega Solicitud de Cheque física firmada.\n\n`;
     cuerpo += `NE: ${ne}\n`;
-    cuerpo += `Referencia: ${referencia}\n\n`;
+    // Cuerpo ahora lista las referencias individuales:
+    if (solicitudes.some(s => s.reference)) {
+      cuerpo += `Referencias adjuntas:\n`;
+      solicitudes.forEach(s => {
+        if (s.reference) {
+          cuerpo += `- Solicitud ${s.id}: ${s.reference}\n`;
+        }
+      });
+      cuerpo += `\n`;
+    } else {
+      cuerpo += `Referencia: N/A\n\n`;
+    }
     cuerpo += `Sin más a que hacer referencia.\n\n`;
     cuerpo += `Atentamente,`;
 
