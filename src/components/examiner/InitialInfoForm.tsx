@@ -46,7 +46,7 @@ export function InitialDataForm() {
     resolver: zodResolver(initialDataSchema),
     defaultValues: {
       ne: existingInitialContextData?.ne || '',
-      reference: existingInitialContextData?.reference || '',
+      // reference: existingInitialContextData?.reference || '', // Removed
       manager: defaultManagerName || '',
       date: existingInitialContextData?.date || undefined,
       recipient: existingInitialContextData?.recipient || '',
@@ -55,9 +55,12 @@ export function InitialDataForm() {
 
 function onSubmit(data: InitialDataFormData) {
   setInitialContextData({
-    ...existingInitialContextData,
-    ...data,
-    reference: data.reference || "",
+    ...existingInitialContextData, // Spread existing context data
+    ne: data.ne, // Explicitly set fields from the form
+    manager: data.manager,
+    date: data.date,
+    recipient: data.recipient,
+    // reference is no longer part of initialContextData
   });
   setCurrentStep(SolicitudStep.PRODUCT_LIST);
 }
@@ -176,7 +179,7 @@ function onSubmit(data: InitialDataFormData) {
                 name="ne"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>NE (Seguimiento NX1) * / No usar Símbolos</FormLabel>
+                    <FormLabel>NE (Seguimiento NX1) * / No usar "/", ni "-".</FormLabel>
                     <FormControl>
                       <Input placeholder="Ej: NX112345" {...field} value={field.value ?? ''} />
                     </FormControl>
@@ -184,19 +187,7 @@ function onSubmit(data: InitialDataFormData) {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="reference"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Referencia (Contenedor, D/Embarque, #FA, Servicio...)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: MSKU1234567" {...field} value={field.value ?? ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Reference field removed from here */}
             </div>
             <div className="flex justify-end pt-2">
               <Button type="submit" className="btn-primary px-6 py-3">
