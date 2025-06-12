@@ -179,7 +179,7 @@ function onSubmit(data: InitialDataFormData) {
                 name="ne"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>NE (Seguimiento NX1) *;.</FormLabel>
+                    <FormLabel>NE (Seguimiento NX1) * / No usar &quot;/&quot;, ni &quot;-&quot;.</FormLabel>
                     <FormControl>
                       <Input placeholder="Ej: NX112345" {...field} value={field.value ?? ''} />
                     </FormControl>
