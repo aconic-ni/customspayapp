@@ -182,7 +182,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     manager: solicitud.examManager,
     date: solicitud.examDate,
     ne: solicitud.examNe,
-    reference: solicitud.examReference || undefined, 
+    reference: solicitud.examReference ?? undefined, // Ensure null is converted to undefined
   };
 
   return (
