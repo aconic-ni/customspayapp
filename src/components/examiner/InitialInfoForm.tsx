@@ -1,7 +1,7 @@
 
 "use client";
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,13 +49,11 @@ export function InitialDataForm() {
       manager: defaultManagerName || '',
       date: existingInitialContextData?.date || undefined,
       recipient: existingInitialContextData?.recipient || '',
-      // reference: existingInitialContextData?.reference || '', // Removed reference
     },
   });
 
-  function onSubmit(data: InitialDataFormData) {
+  const onSubmit: SubmitHandler<InitialDataFormData> = (data) => {
     setInitialContextData({
-      // Ensure we only pass fields expected by Omit<InitialDataContext, 'reference'>
       ne: data.ne,
       manager: data.manager,
       date: data.date,
@@ -186,7 +184,6 @@ export function InitialDataForm() {
                   </FormItem>
                 )}
               />
-              {/* Reference field FormField removed from here */}
             </div>
             <div className="flex justify-end pt-2">
               <Button type="submit" className="btn-primary px-6 py-3">
