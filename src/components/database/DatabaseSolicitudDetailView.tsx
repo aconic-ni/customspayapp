@@ -121,7 +121,6 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
               emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
               emailMinutaLastUpdatedBy: data.emailMinutaLastUpdatedBy || null,
               commentsCount: data.commentsCount || 0,
-              hasOpenUrgentComment: data.hasOpenUrgentComment ?? false,
             });
           } else {
             setError("Solicitud no encontrada.");
@@ -177,12 +176,12 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     return <div className="text-center text-muted-foreground py-4">No se encontró la solicitud.</div>;
   }
   
-  const initialDataForDisplay = {
+  const initialDataForDisplay: Partial<InitialDataContext> = {
     recipient: solicitud.examRecipient,
     manager: solicitud.examManager,
     date: solicitud.examDate,
     ne: solicitud.examNe,
-    reference: solicitud.examReference ?? undefined, // Ensure null is converted to undefined
+    reference: solicitud.examReference || undefined,
   };
 
   return (
@@ -209,9 +208,6 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
                     PAGADA
                   </Badge>
                 )}
-                 {solicitud.hasOpenUrgentComment && (
-                  <Badge variant="destructive" className="ml-2 text-xs whitespace-nowrap">URGENTE</Badge>
-                )}
             </div>
           </div>
           <div className="mb-3 p-4 border border-border rounded-md bg-secondary/30 card-print-styles">
@@ -221,7 +217,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
                 <DetailItem label="De (Usuario)" value={initialDataForDisplay.manager} icon={User} />
                 <DetailItem label="Fecha de Solicitud" value={initialDataForDisplay.date} icon={CalendarDays} />
                 <DetailItem label="NE (Tracking NX1)" value={initialDataForDisplay.ne} icon={Info} />
-                <DetailItem label="Referencia" value={initialDataForDisplay.reference} icon={FileText} className="md:col-span-2"/>
+                <DetailItem label="Referencia" value={initialDataForDisplay.reference || 'N/A'} icon={FileText} className="md:col-span-2"/>
              </div>
           </div>
           
@@ -232,7 +228,7 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 items-start mb-3">
               <div className="flex items-baseline py-1">
                 <Banknote className="h-4 w-4 mr-1.5 text-primary shrink-0" />
-                <p className="text-sm text-foreground break-words">{formatCurrency(solicitud.monto, solicitud.montoMoneda)}</p>
+                <p className="text-sm text-foreground break-words">{formatCurrency(solicitud.monto, solicitud.montoMoneda || undefined)}</p>
               </div>
               <div className="flex items-baseline py-1">
                 <FileText className="h-4 w-4 mr-1.5 text-primary shrink-0" />
@@ -338,3 +334,4 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
     </div>
   );
 }
+    
