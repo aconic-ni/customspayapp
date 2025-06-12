@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext, SolicitudStep } from '@/context/AppContext';
-import type { InitialDataFormData } from './FormParts/zodSchemas';
-import { initialDataSchema } from './FormParts/zodSchemas';
+import type { InitialDataFormData } from '@/components/examiner/FormParts/zodSchemas'; // Assuming path is similar
+import { initialDataSchema } from '@/components/examiner/FormParts/zodSchemas'; // Assuming path is similar
 import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
@@ -52,7 +52,7 @@ export function InitialDataForm() {
     },
   });
 
-  const onSubmit: SubmitHandler<InitialDataFormData> = (data) => {
+  const onSubmit: SubmitHandler<InitialDataFormData> = (data: InitialDataFormData) => {
     setInitialContextData({
       ne: data.ne,
       manager: data.manager,
