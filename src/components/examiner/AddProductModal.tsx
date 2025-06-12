@@ -21,12 +21,14 @@ import { X, Hash, FileText, Tag, Landmark, Mail, FilePlus, DollarSign, ListFilte
 import { numeroALetras } from '@/lib/numeroALetras';
 import { Label } from '@/components/ui/label';
 
+// Define the structure for the account registry
 interface AccountRegistryEntry {
-  id: string; 
+  id: string; // e.g., "1", "2", ... "30"
   name: string;
   accountNumber: string;
 }
 
+// Predefined account registry data
 const accountRegistryData: AccountRegistryEntry[] = [
 { id: "1", name: "apen Bancentro C$", accountNumber: "240200457" },
 { id: "2", name: "DHL Bancentro C$", accountNumber: "100202913" },
@@ -80,8 +82,7 @@ export function AddProductModal() {
   const form = useForm<SolicitudFormData>({
     resolver: zodResolver(solicitudSchema),
     defaultValues: { 
-      reference: '', // Added
-      monto: 0, 
+      monto: 0, // Zod schema expects number after preprocess
       montoMoneda: 'cordoba',
       cantidadEnLetras: '',
       consignatario: '',
@@ -120,7 +121,7 @@ export function AddProductModal() {
   const watchedMonedaCuenta = form.watch("monedaCuenta");
   const watchedImpuestosPagados = form.watch("impuestosPagadosCliente");
   const watchedConstanciasNoRetencion = form.watch("constanciasNoRetencion");
-  const watchedMonto = form.watch("monto"); 
+  const watchedMonto = form.watch("monto"); // This will be a number from RHF state
   const watchedMontoMoneda = form.watch("montoMoneda");
   const watchedPagoServicios = form.watch("pagoServicios");
   const watchedTipoServicio = form.watch("tipoServicio");
@@ -183,7 +184,6 @@ export function AddProductModal() {
     if (isAddProductModalOpen) {
       const defaultCorreo = user?.email || '';
       const initialValues: SolicitudFormData = {
-        reference: '', // Added
         monto: 0, 
         montoMoneda: 'cordoba',
         cantidadEnLetras: '',
@@ -221,11 +221,14 @@ export function AddProductModal() {
       setSelectedAccountName(null); 
 
       if (editingSolicitud) {
+        // editingSolicitud.monto is number | undefined from SolicitudData
+        // For the form, RHF expects a number for 'monto' based on Zod schema
         const montoForForm = editingSolicitud.monto ?? 0;
+
+
         const populatedEditingSolicitud: SolicitudFormData = {
           ...initialValues, 
-          ...editingSolicitud,
-          reference: editingSolicitud.reference || '', // Added
+          ...editingSolicitud, 
           monto: montoForForm, 
           correo: editingSolicitud.correo || defaultCorreo, 
           soporte: editingSolicitud.soporte ?? false, 
@@ -250,6 +253,8 @@ export function AddProductModal() {
         if (matchingAccount) {
             setSelectedAccountName(matchingAccount.name);
         }
+
+
       } else {
         form.reset(initialValues);
         setShowBancoOtros(false);
@@ -271,11 +276,14 @@ export function AddProductModal() {
   };
 
 function onSubmit(data: SolicitudFormData) {
+    // data.monto is already a number here due to Zod schema processing
+    // and RHF managing the form state as number for 'monto'.
     const solicitudDataToSave: Omit<SolicitudData, 'id'> & { id?: string } = {
-        ...data, 
-        monto: data.monto, 
+        ...data, // data already conforms to SolicitudFormData
+        monto: data.monto, // data.monto is number here
         soporte: data.soporte ?? false,
         pagoServicios: data.pagoServicios ?? false,
+        // Ensure enum types are correctly cast if necessary, though Zod should handle this.
         montoMoneda: data.montoMoneda as SolicitudData['montoMoneda'],
         banco: data.banco as SolicitudData['banco'],
         monedaCuenta: data.monedaCuenta as SolicitudData['monedaCuenta'],
@@ -329,7 +337,6 @@ function onSubmit(data: SolicitudFormData) {
                         if (fieldError && fieldError.message) {
                           let readableFieldName = fieldName;
                           const fieldNameMap: { [key: string]: string } = {
-                            reference: "Referencia", // Added
                             monto: "Monto",
                             montoMoneda: "Moneda del Monto",
                             cantidadEnLetras: "Cantidad en Letras",
@@ -370,22 +377,6 @@ function onSubmit(data: SolicitudFormData) {
                 )}
 
                 <div className="space-y-4 p-4 border rounded-md">
-                  <FormField
-                    control={form.control}
-                    name="reference"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center text-foreground"><FileText className="mr-2 h-4 w-4 text-primary" />Referencia (Contenedor, D/Embarque, #FA, Servicio...)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: MSKU1234567" {...field} value={field.value ?? ''} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-4 p-4 border rounded-md">
                   <h4 className="text-md font-medium text-primary mb-2">Detalles del Monto</h4>
                   <FormField control={form.control} name="monto" render={({ field }) => ( 
                     <FormItem>
@@ -403,7 +394,7 @@ function onSubmit(data: SolicitudFormData) {
                             value={field.value === 0 && !form.getFieldState("monto").isDirty ? '' : String(field.value ?? '')} 
                             onChange={(e) => {
                               const sanitized = sanitizeMontoInput(e.target.value);
-                              field.onChange(sanitized); 
+                              field.onChange(sanitized); // Pass string to Zod preprocess
                             }}
                             className="w-2/3"
                           />
