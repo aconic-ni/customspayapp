@@ -7,12 +7,13 @@ import { useAppContext } from '@/context/AppContext';
 import type { SolicitudData } from '@/types';
 import { Eye, Edit3, Trash2, MoreHorizontal, FileText, AlertTriangle, Info, CalendarDays } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-// useRouter is no longer needed for the "Ver" action here
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useToast } from "@/hooks/use-toast"; // Added
 
 export function ProductTable() {
   const { initialContextData, solicitudes, openAddProductModal, deleteSolicitud, setSolicitudToViewInline } = useAppContext();
+  const { toast } = useToast(); // Added
 
   const formatCurrency = (amount?: number | string, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
@@ -62,6 +63,9 @@ export function ProductTable() {
               ID Solicitud
             </TableHead>
             <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+              Referencia
+            </TableHead>
+            <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
               <CalendarDays className="inline-block h-3.5 w-3.5 mr-1 align-middle" />
               Fecha de Solicitud
             </TableHead>
@@ -77,6 +81,7 @@ export function ProductTable() {
             <TableRow key={solicitud.id} className="hover:bg-muted/50">
               <TableCell className="px-4 py-3 text-sm text-muted-foreground">{renderStatusBadges(solicitud)}</TableCell>
               <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{solicitud.id}</TableCell>
+              <TableCell className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">{solicitud.reference || 'N/A'}</TableCell>
               <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                 {initialContextData?.date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'N/A'}
               </TableCell>
@@ -99,11 +104,27 @@ export function ProductTable() {
                     <DropdownMenuItem onClick={() => openAddProductModal(solicitud)}>
                       <Edit3 className="mr-2 h-4 w-4" /> Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {
-                      if (confirm('¿Está seguro de que desea eliminar esta solicitud?')) {
-                        deleteSolicitud(solicitud.id);
-                      }
-                    }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        console.log('[ProductTable] Delete clicked. Solicitud object:', JSON.stringify(solicitud));
+                        console.log('[ProductTable] Solicitud ID to delete:', solicitud.id);
+
+                        if (typeof solicitud.id !== 'string' || !solicitud.id) {
+                          console.error('[ProductTable] Invalid solicitud.id for deletion:', solicitud.id);
+                          toast({
+                            title: "Error de Eliminación Interno",
+                            description: `No se pudo eliminar la solicitud. ID inválido: ${solicitud.id}`,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+
+                        if (confirm('¿Está seguro de que desea eliminar esta solicitud?')) {
+                          deleteSolicitud(solicitud.id);
+                        }
+                      }} 
+                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                    >
                       <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                     </DropdownMenuItem>
                   </DropdownMenuContent>
