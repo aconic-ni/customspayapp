@@ -77,7 +77,7 @@ export function ProductListScreen() {
                     <div><span className="font-semibold">De (Usuario):</span> {initialContextData.manager}</div>
                     <div><span className="font-semibold">Fecha:</span> {initialContextData.date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'N/A'}</div>
                     <div><span className="font-semibold">NE:</span> {initialContextData.ne}</div>
-                    <div><span className="font-semibold">Referencia:</span> {initialContextData.reference || 'N/A'}</div>
+                    {/* Reference removed from general info display */}
                 </div>
                 <div className="mt-3">
                     <Button variant="link" onClick={() => setCurrentStep(SolicitudStep.INITIAL_DATA)} className="text-primary p-0 h-auto hover:underline">
@@ -102,3 +102,5 @@ export function ProductListScreen() {
     </>
   );
 }
+
+    
