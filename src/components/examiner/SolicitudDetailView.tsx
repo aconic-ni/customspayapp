@@ -46,7 +46,7 @@ const CheckboxDetailItem: React.FC<{ label: string; checked?: boolean; subLabel?
 
 interface SolicitudDetailViewProps {
   solicitud: SolicitudData | null;
-  initialData: InitialDataContext | null;
+  initialData: Omit<InitialDataContext, 'reference'> | null; // Reference removed from initialData
   onBackToList: () => void;
 }
 
@@ -101,8 +101,7 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
   return (
     <div className="solicitud-detail-print-area py-0"> 
       <Card className="w-full max-w-4xl mx-auto custom-shadow card-print-styles">
-        {/* CardHeader has been removed */}
-        <CardContent className="pt-4"> {/* Reduced top padding from pt-6 to pt-4 */}
+        <CardContent className="pt-4"> 
             <Image
                 src={`${basePath}/imagenes/HEADERSOLICITUDDETAIL.svg`}
                 alt="Header Solicitud Detail"
@@ -143,7 +142,7 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
                   <DetailItem label="De (Usuario)" value={initialData.manager} icon={User} />
                   <DetailItem label="Fecha de Solicitud" value={initialData.date} icon={CalendarDays} />
                   <DetailItem label="NE (Tracking NX1)" value={initialData.ne} icon={Info} />
-                  <DetailItem label="Referencia" value={initialData.reference || 'N/A'} icon={FileText} className="md:col-span-2"/>
+                  <DetailItem label="Referencia" value={solicitud.reference || 'N/A'} icon={FileText} className="md:col-span-2"/>
                 </div>
               </div>
 
@@ -259,4 +258,3 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
     </div>
   );
 }
-
