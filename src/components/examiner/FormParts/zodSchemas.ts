@@ -6,7 +6,7 @@ export const initialDataSchema = z.object({
   ne: z.string()
     .min(1, "NE es requerido.")
     .regex(/^[a-zA-Z0-9\s]*$/, "NE solo puede contener letras, números y espacios."),
-  // reference: z.string().optional(), // Removed
+  reference: z.string().optional(),
   manager: z.string().min(1, "Nombre del Usuario es requerido."),
   date: z.date({ required_error: "Fecha es requerida." }),
   recipient: z.string().min(1, "Destinatario es requerido."),
@@ -18,7 +18,6 @@ export type InitialDataFormData = z.infer<typeof initialDataSchema>;
 // Zod schema for the "Nueva Solicitud" form (previously productSchema)
 export const solicitudSchema = z.object({
   id: z.string().optional(),
-  reference: z.string().optional(), // Added per-solicitud reference
 
   monto: z.preprocess(
     (val) => (val === "" || val === undefined || val === null) ? undefined : (typeof val === 'string' ? parseFloat(String(val).replace(/,/g, '')) : val),
@@ -94,6 +93,7 @@ export const solicitudSchema = z.object({
         path: ['tipoServicio'],
       });
     }
+    // Removed required validation for facturaServicio
     if (!data.institucionServicio?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
