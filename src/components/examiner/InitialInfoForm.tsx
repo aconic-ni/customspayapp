@@ -1,7 +1,7 @@
 
 "use client";
 import * as React from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,21 +46,21 @@ export function InitialDataForm() {
     resolver: zodResolver(initialDataSchema),
     defaultValues: {
       ne: existingInitialContextData?.ne || '',
+      reference: existingInitialContextData?.reference || '',
       manager: defaultManagerName || '',
       date: existingInitialContextData?.date || undefined,
       recipient: existingInitialContextData?.recipient || '',
     },
   });
 
-  const onSubmit: SubmitHandler<InitialDataFormData> = (data) => {
-    setInitialContextData({
-      ne: data.ne,
-      manager: data.manager,
-      date: data.date,
-      recipient: data.recipient,
-    });
-    setCurrentStep(SolicitudStep.PRODUCT_LIST);
-  }
+function onSubmit(data: InitialDataFormData) {
+  setInitialContextData({
+    ...existingInitialContextData,
+    ...data,
+    reference: data.reference || "",
+  });
+  setCurrentStep(SolicitudStep.PRODUCT_LIST);
+}
 
   return (
     <Card className="w-full max-w-3xl mx-auto custom-shadow">
@@ -176,9 +176,22 @@ export function InitialDataForm() {
                 name="ne"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>NE (Seguimiento NX1) * / No usar &quot;/&quot;, ni &quot;-&quot;.</FormLabel>
+                    <FormLabel>NE (Seguimiento NX1) * / No usar "/", ni "-".</FormLabel>
                     <FormControl>
                       <Input placeholder="Ej: NX112345" {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="reference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Referencia (Contenedor, D/Embarque, #FA, Servicio...)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ej: MSKU1234567" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
