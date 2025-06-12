@@ -46,24 +46,23 @@ export function InitialDataForm() {
     resolver: zodResolver(initialDataSchema),
     defaultValues: {
       ne: existingInitialContextData?.ne || '',
-      // reference: existingInitialContextData?.reference || '', // Removed
       manager: defaultManagerName || '',
       date: existingInitialContextData?.date || undefined,
       recipient: existingInitialContextData?.recipient || '',
+      // reference: existingInitialContextData?.reference || '', // Removed reference
     },
   });
 
-function onSubmit(data: InitialDataFormData) {
-  setInitialContextData({
-    ...existingInitialContextData, // Spread existing context data
-    ne: data.ne, // Explicitly set fields from the form
-    manager: data.manager,
-    date: data.date,
-    recipient: data.recipient,
-    // reference is no longer part of initialContextData
-  });
-  setCurrentStep(SolicitudStep.PRODUCT_LIST);
-}
+  function onSubmit(data: InitialDataFormData) {
+    setInitialContextData({
+      // Ensure we only pass fields expected by Omit<InitialDataContext, 'reference'>
+      ne: data.ne,
+      manager: data.manager,
+      date: data.date,
+      recipient: data.recipient,
+    });
+    setCurrentStep(SolicitudStep.PRODUCT_LIST);
+  }
 
   return (
     <Card className="w-full max-w-3xl mx-auto custom-shadow">
@@ -187,7 +186,7 @@ function onSubmit(data: InitialDataFormData) {
                   </FormItem>
                 )}
               />
-              {/* Reference field removed from here */}
+              {/* Reference field FormField removed from here */}
             </div>
             <div className="flex justify-end pt-2">
               <Button type="submit" className="btn-primary px-6 py-3">
