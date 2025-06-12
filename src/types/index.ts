@@ -1,4 +1,3 @@
-
 import type { Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 
 // Represents the data collected in the initial form, held in AppContext
@@ -61,8 +60,8 @@ export interface AppUser {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  role?: 'revisor' | 'calificador' | 'autorevisor' | 'admin' | 'autorevisor_plus' | string; // Added 'admin' and 'autorevisor_plus'
-  canReviewUserEmail?: string; // For autorevisor_plus
+  role?: 'revisor' | 'calificador' | 'autorevisor' | 'admin' | 'autorevisor_plus' | string;
+  canReviewUserEmails?: string[]; // Changed from canReviewUserEmail: string to string[]
 }
 
 // Represents the structure of each document in the "SolicitudCheques" collection
