@@ -196,6 +196,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   };
 
   const isGuardadoPorFilterDisabled = currentUserRole === 'autorevisor' || currentUserRole === 'autorevisor_plus';
+  const canUserValidateDuplicates = currentUserRole === 'calificador' || currentUserRole === 'admin';
 
   return (
     <Card className="mt-6 w-full custom-shadow">
@@ -226,7 +227,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     >
                       <Search className="mr-2 h-4 w-4" /> Ver solo este conjunto
                     </Button>
-                    {currentUserRole === 'calificador' && (
+                    {canUserValidateDuplicates && (
                         <>
                         <Button
                             variant="outline"
@@ -404,8 +405,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   rowClass = 'bg-rose-200 hover:bg-rose-300 dark:bg-rose-500/50 dark:hover:bg-rose-500/60';
                 } else if (isMarkedAsDuplicate && isEffectivelyResolved) {
                   rowClass = 'bg-emerald-200 hover:bg-emerald-300 dark:bg-emerald-500/50 dark:hover:bg-emerald-500/60';
-                } else if (solicitud.soporte) {
-                  rowClass = 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-700/30 dark:hover:bg-amber-700/40';
+                } else if (solicitud.soporte) { 
+                  rowClass = 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-700/30 dark:hover:bg-amber-700/40'; 
                 }
                 
                 return (
@@ -492,8 +493,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                           }}
                           aria-label="Marcar como pagado / pendiente"
                         />
-                        <Button variant="ghost" size="icon" onClick={() => onOpenMessageDialog(solicitud.solicitudId)} aria-label="Añadir mensaje de error">
-                          <MessageSquare className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                        <Button variant="ghost" size="icon" onClick={() => onOpenMessageDialog(solicitud.solicitudId)} aria-label="Añadir mensaje de error" className="h-7 w-7 p-0">
+                          <MessageSquare className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </Button>
                         {solicitud.paymentStatus === 'Pagado' && (
                             <Badge className="bg-green-100 text-green-700 hover:bg-green-200">Pagado</Badge>
@@ -1120,7 +1121,7 @@ export default function DatabasePage() {
 
   const openCommentsDialog = async (solicitudId: string) => {
     setCurrentSolicitudIdForComments(solicitudId);
-    setIsNewCommentUrgent(false); // Reset urgency toggle
+    setIsNewCommentUrgent(false); 
     setComments([]);
     setIsLoadingComments(true);
     setIsCommentsDialogOpen(true);
@@ -1177,7 +1178,7 @@ export default function DatabasePage() {
       const docRefComment = await addDoc(commentsCollectionRef, newCommentData);
 
       let newHasOpenUrgentCommentFlag: boolean | undefined = undefined;
-      if (isNewCommentUrgent) {
+      if (isNewCommentUrgent) { 
         const solicitudDocRef = doc(db, "SolicitudCheques", currentSolicitudIdForComments);
         await updateDoc(solicitudDocRef, { hasOpenUrgentComment: true });
         newHasOpenUrgentCommentFlag = true;
@@ -1185,7 +1186,7 @@ export default function DatabasePage() {
 
       setComments(prev => [...prev, { ...newCommentData, id: docRefComment.id, createdAt: new Date() } as CommentRecord]);
       setNewCommentText('');
-      setIsNewCommentUrgent(false);
+      setIsNewCommentUrgent(false); 
       toast({ title: "Éxito", description: "Comentario publicado." });
 
       setFetchedSolicitudes(prevSolicitudes =>
@@ -1210,7 +1211,8 @@ export default function DatabasePage() {
   };
 
   const handleResolveDuplicate = useCallback(async (duplicateKey: string, resolutionStatus: "validated_not_duplicate" | "deletion_requested") => {
-    if (!user || !user.email || user.role !== 'calificador') {
+    const allowedRoles = ['calificador', 'admin'];
+    if (!user || !user.email || !user.role || !allowedRoles.includes(user.role)) {
       toast({ title: "Error", description: "Acción no autorizada.", variant: "destructive" });
       return;
     }
@@ -1712,6 +1714,7 @@ export default function DatabasePage() {
   }
 
   const isUserAdminOrRevisor = user?.role === 'admin' || user?.role === 'revisor';
+  const isUserCalificador = user?.role === 'calificador';
   const isUserAllowedToMarkUrgent = user?.role === 'autorevisor' || user?.role === 'autorevisor_plus' || user?.role === 'revisor';
 
 
@@ -1734,7 +1737,7 @@ export default function DatabasePage() {
                     {isUserAdminOrRevisor && (
                         <SelectItem value="dateCurrentMonth">Por Mes (Actual)</SelectItem>
                     )}
-                    {isUserAdminOrRevisor && (
+                    {isUserCalificador && (
                        <SelectItem value="dateRange">Por Rango de Fechas</SelectItem>
                     )}
                   </SelectContent>
