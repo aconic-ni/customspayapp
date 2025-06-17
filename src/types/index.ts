@@ -4,7 +4,7 @@ import type { Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 // Represents the data collected in the initial form, held in AppContext
 export interface InitialDataContext {
   ne: string;
-  reference: string;
+  reference?: string; // Made optional to match zod schema
   manager: string; // "De (Nombre Usuario)"
   date: Date; // Should always be a Date object in the context
   recipient: string; // "A:"
@@ -148,8 +148,9 @@ export interface CommentRecord {
 
 
 // For exporting, it combines InitialDataContext-like info with SolicitudData-like info
-export interface ExportableSolicitudContextData extends Omit<InitialDataContext, 'date'> {
+export interface ExportableSolicitudContextData extends Omit<InitialDataContext, 'date' | 'reference'> {
   date?: Date | FirestoreTimestamp | null; 
+  reference?: string | null; // Make reference optional or allow null
   solicitudes?: SolicitudData[] | null;
   savedAt?: Date | FirestoreTimestamp | null;
   savedBy?: string | null;
@@ -164,4 +165,12 @@ export interface ValidacionRecord {
   duplicateIds: string[];
   resolutionStatus: "validated_not_duplicate" | "deletion_requested";
   ne: string; // To help with querying/displaying
+}
+
+// New type for recording deletion audit events
+export interface DeletionAuditEvent {
+  id?: string; // Firestore auto-generated ID for the audit entry
+  action: 'deleted';
+  deletedAt: Date; // JS Date for client (converted from serverTimestamp on read)
+  deletedBy: string; // Email of the admin who performed the deletion
 }
