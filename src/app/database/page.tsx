@@ -10,8 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw, AlertTriangle, ShieldCheck, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer, writeBatch, deleteDoc, type QueryConstraint } from 'firebase/firestore';
-import type { SolicitudRecord, CommentRecord, ValidacionRecord } from '@/types';
+import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer, writeBatch, deleteDoc, type QueryConstraint, setDoc } from 'firebase/firestore';
+import type { SolicitudRecord, CommentRecord, ValidacionRecord, DeletionAuditEvent } from '@/types';
 import { downloadExcelFileFromTable } from '@/lib/fileExporter';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -1258,22 +1258,51 @@ export default function DatabasePage() {
   };
 
   const confirmDeleteSolicitud = async () => {
-    if (!solicitudToDeleteId || user?.role !== 'admin') {
+    if (!solicitudToDeleteId || user?.role !== 'admin' || !user.email) {
       toast({ title: "Error", description: "No se pudo eliminar la solicitud o acción no autorizada.", variant: "destructive" });
       setIsDeleteDialogOpen(false);
       return;
     }
+
+    const originalDocRef = doc(db, "SolicitudCheques", solicitudToDeleteId);
+    
     try {
-      const docRef = doc(db, "SolicitudCheques", solicitudToDeleteId);
-      await deleteDoc(docRef);
-      toast({ title: "Éxito", description: `Solicitud ${solicitudToDeleteId} eliminada.` });
+      const originalDocSnap = await getDoc(originalDocRef);
+      if (!originalDocSnap.exists()) {
+        toast({ title: "Error", description: `La solicitud ${solicitudToDeleteId} no existe.`, variant: "destructive" });
+        setIsDeleteDialogOpen(false);
+        return;
+      }
+
+      const originalData = originalDocSnap.data();
+
+      // Prepare data for Eliminaciones collection (direct copy of original data)
+      const eliminacionDocRef = doc(db, "Eliminaciones", solicitudToDeleteId);
+      
+      // Prepare data for AuditTrail subcollection
+      const auditEventRef = doc(collection(db, "Eliminaciones", solicitudToDeleteId, "AuditTrail"));
+      const auditEventData: Omit<DeletionAuditEvent, 'id' | 'deletedAt'> & { deletedAt: any } = {
+        action: 'deleted',
+        deletedBy: user.email,
+        deletedAt: serverTimestamp(),
+      };
+
+      const batch = writeBatch(db);
+      batch.set(eliminacionDocRef, originalData); // Store the full original document
+      batch.set(auditEventRef, auditEventData);   // Store the audit event in subcollection
+      batch.delete(originalDocRef);               // Delete original document
+
+      await batch.commit();
+
+      toast({ title: "Éxito", description: `Solicitud ${solicitudToDeleteId} eliminada y archivada.` });
       setFetchedSolicitudes(prev => prev ? prev.filter(s => s.solicitudId !== solicitudToDeleteId) : null);
+      
+    } catch (err) {
+      console.error("Error deleting and archiving solicitud:", err);
+      toast({ title: "Error", description: "No se pudo completar la eliminación y archivado.", variant: "destructive" });
+    } finally {
       setIsDeleteDialogOpen(false);
       setSolicitudToDeleteId(null);
-    } catch (err) {
-      console.error("Error deleting solicitud:", err);
-      toast({ title: "Error", description: "No se pudo eliminar la solicitud.", variant: "destructive" });
-      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -1969,7 +1998,7 @@ export default function DatabasePage() {
             <DialogTitle>Confirmar Eliminación</DialogTitle>
           </DialogHeader>
           <DialogDescription>
-           Estas seguro de realizar esta opción. Operacion de borrar es permanente.
+           Estas seguro de realizar esta opción. Operacion de borrar es permanente. La solicitud será archivada.
           </DialogDescription>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => { setIsDeleteDialogOpen(false); setSolicitudToDeleteId(null); }}>Cancelar</Button>
