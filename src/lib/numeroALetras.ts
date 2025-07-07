@@ -45,27 +45,59 @@ function convertirSegmento(n: number): string {
                 }
             }
             // Add unit if:
-            // 1. It's a unit from 1-9 (d=0, u>0)
-            // 2. It's the unit part of 21-29 (d=2, u>0, "VEINTIUNO" - handled by not adding here if VEINTI was used)
-            // 3. It's the unit part of 31-39, 41-49, etc. (where "Y" was added)
-            if (u > 0) {
-                if (d === 2 && c > 0) { // e.g. CIENTO VEINTIUNO
-                    // For 21-29, VEINTI is usually preferred but current 'decenas' has 'VEINTE'
-                    // If 'VEINTE' was pushed and u > 0, we need to handle 'VEINTIUNO' case
-                    // This logic can be complex. Simplified for now:
-                    // If decenas[2] is 'VEINTE', then we need to form 'VEINTI...'
-                    if (decenas[d] === 'VEINTE') {
-                         // Remove "VEINTE" if previously added to form "VEINTI..."
-                        if (parts.length > 0 && parts[parts.length - 1] === 'VEINTE') {
-                            parts.pop();
-                        }
-                        parts.push('VEINTI' + unidades[u].toLowerCase());
-                    } else {
-                         parts.push(unidades[u]);
-                    }
-                } else if (d !== 1) { // Avoid double count for 10-19 and ensure 21-29 not double counted if VEINTI is used
-                     parts.push(unidades[u]);
+            // 1. It's a unit from 1-9 (d=0, u>0// Number to words converter for Spanish
+// Handles numbers up to 9,999,999.99
+
+const unidades = [
+  '', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'
+];
+const decenas = [
+  '', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'
+];
+const especiales = [ // For 10-19
+  'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'
+];
+const centenas = [
+  '', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'
+];
+
+function convertirSegmento(n: number): string {
+    if (n < 0 || n > 999) return ""; // Handles segments of 3 digits
+
+    let parts: string[] = [];
+
+    const c = Math.floor(n / 100); // Hundreds digit
+    const resto = n % 100;         // Remainder for tens and units
+
+    if (c > 0) {
+        if (c === 1 && resto === 0) { // Exactly 100
+            parts.push('CIEN');
+        } else {
+            parts.push(centenas[c]); // e.g., CIENTO, DOSCIENTOS. centenas[1] is CIENTO
+        }
+    }
+
+    if (resto > 0) {
+        const d = Math.floor(resto / 10); // Tens digit of the remainder
+        const u = resto % 10;             // Units digit of the remainder
+
+        if (resto >= 10 && resto <= 19) {
+            parts.push(especiales[resto - 10]);
+        } else if (resto >= 20 && resto <= 29) {
+            if (resto === 20) {
+                parts.push('VEINTE');
+            } else {
+                parts.push('VEINTI' + unidades[u]);
+            }
+        } else { // Handles 0-9 and 30-99
+            if (d >= 3) { // 30-99
+                parts.push(decenas[d]);
+                if (u > 0) {
+                    parts.push('Y');
+                    parts.push(unidades[u]);
                 }
+            } else if (u > 0) { // Handles units 1-9
+                parts.push(unidades[u]);
             }
         }
     }
