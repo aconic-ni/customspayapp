@@ -35,52 +35,6 @@ function convertirSegmento(n: number): string {
         const d = Math.floor(resto / 10); // Tens digit of the remainder
         const u = resto % 10;             // Units digit of the remainder
 
-        if (resto >= 10 && resto <= 19) { // 10-19
-            parts.push(especiales[resto - 10]);
-        } else { // 0-9 or 20-99
-            if (d >= 2) { // 20-99
-                parts.push(decenas[d]); // VEINTE, TREINTA...
-                if (u > 0 && d > 2) { // For 31-39, 41-49... "TREINTA Y UNO"
-                    parts.push('Y');
-                }
-            }
-            // Add unit if:
-            // 1. It's a unit from 1-9 (d=0, u>0// Number to words converter for Spanish
-// Handles numbers up to 9,999,999.99
-
-const unidades = [
-  '', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'
-];
-const decenas = [
-  '', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'
-];
-const especiales = [ // For 10-19
-  'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'
-];
-const centenas = [
-  '', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'
-];
-
-function convertirSegmento(n: number): string {
-    if (n < 0 || n > 999) return ""; // Handles segments of 3 digits
-
-    let parts: string[] = [];
-
-    const c = Math.floor(n / 100); // Hundreds digit
-    const resto = n % 100;         // Remainder for tens and units
-
-    if (c > 0) {
-        if (c === 1 && resto === 0) { // Exactly 100
-            parts.push('CIEN');
-        } else {
-            parts.push(centenas[c]); // e.g., CIENTO, DOSCIENTOS. centenas[1] is CIENTO
-        }
-    }
-
-    if (resto > 0) {
-        const d = Math.floor(resto / 10); // Tens digit of the remainder
-        const u = resto % 10;             // Units digit of the remainder
-
         if (resto >= 10 && resto <= 19) {
             parts.push(especiales[resto - 10]);
         } else if (resto >= 20 && resto <= 29) {
