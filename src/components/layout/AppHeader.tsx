@@ -49,8 +49,8 @@ export function AppHeader() {
 
   return (
     <header className="bg-card shadow-sm sticky top-0 z-40">
-      <div className="container mx-auto px-4 py-3 max-w-7xl">
-        <div className="flex justify-between items-center">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center py-3">
           <div className="flex flex-col items-start">
             {/* El nombre de la aplicación y el icono ya no son un enlace */}
             <div className="flex items-center gap-2">
