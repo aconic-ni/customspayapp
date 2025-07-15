@@ -255,7 +255,7 @@ export default function ValidacionesPage() {
     return (
       <AppShell>
         <div className="py-2 md:py-5">
-          <Card className="w-full max-w-3xl mx-auto custom-shadow">
+          <Card className="w-full custom-shadow">
             <CardHeader>
               <CardTitle className="text-2xl font-semibold text-destructive">Acceso Denegado</CardTitle>
             </CardHeader>
@@ -272,7 +272,7 @@ export default function ValidacionesPage() {
   return (
     <AppShell>
       <div className="py-2 md:py-5">
-        <Card className="w-full max-w-7xl mx-auto custom-shadow">
+        <Card className="w-full custom-shadow">
           <CardHeader>
             <CardTitle className="text-2xl font-semibold text-foreground">Consulta de Validaciones</CardTitle>
             <CardDescription className="text-muted-foreground">
