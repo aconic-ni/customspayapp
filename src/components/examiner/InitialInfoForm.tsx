@@ -63,7 +63,7 @@ function onSubmit(data: InitialDataFormData) {
 }
 
   return (
-    <Card className="w-full max-w-3xl mx-auto custom-shadow">
+    <Card className="w-full custom-shadow">
       <CardHeader>
         <CardTitle className="text-2xl font-semibold text-gray-800">Solicitud de Cheque</CardTitle>
       </CardHeader>
@@ -176,7 +176,7 @@ function onSubmit(data: InitialDataFormData) {
                 name="ne"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>NE (Seguimiento NX1) * / No usar simbolos</FormLabel>
+                    <FormLabel>NE (Seguimiento NX1) * / No usar "/", ni "-".</FormLabel>
                     <FormControl>
                       <Input placeholder="Ej: NX112345" {...field} value={field.value ?? ''} />
                     </FormControl>
