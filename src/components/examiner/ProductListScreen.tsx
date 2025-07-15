@@ -49,7 +49,7 @@ export function ProductListScreen() {
 
   return (
     <>
-      <Card className="w-full max-w-7xl mx-auto custom-shadow">
+      <Card className="w-full custom-shadow">
         <CardHeader>
           <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-2 gap-4">
             <CardTitle className="text-xl md:text-2xl font-semibold text-gray-800">SOLICITUDES</CardTitle>
@@ -77,7 +77,7 @@ export function ProductListScreen() {
                     <div><span className="font-semibold">De (Usuario):</span> {initialContextData.manager}</div>
                     <div><span className="font-semibold">Fecha:</span> {initialContextData.date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'N/A'}</div>
                     <div><span className="font-semibold">NE:</span> {initialContextData.ne}</div>
-                    {/* Reference removed from general info display */}
+                    <div><span className="font-semibold">Referencia:</span> {initialContextData.reference || 'N/A'}</div>
                 </div>
                 <div className="mt-3">
                     <Button variant="link" onClick={() => setCurrentStep(SolicitudStep.INITIAL_DATA)} className="text-primary p-0 h-auto hover:underline">
@@ -102,5 +102,3 @@ export function ProductListScreen() {
     </>
   );
 }
-
-    
