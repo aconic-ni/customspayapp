@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw, AlertTriangle, ShieldCheck, Trash2 } from 'lucide-react';
+import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw, AlertTriangle, ShieldCheck, Trash2, FileSignature } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer, writeBatch, deleteDoc, type QueryConstraint, setDoc } from 'firebase/firestore';
 import type { SolicitudRecord, CommentRecord, ValidacionRecord, DeletionAuditEvent } from '@/types';
@@ -84,10 +84,12 @@ interface SearchResultsTableProps {
   searchType: SearchType;
   searchTerm?: string;
   currentUserRole?: string;
+  isMinutaValidationEnabled: boolean;
   onUpdatePaymentStatus: (solicitudId: string, newPaymentStatus: string | null) => Promise<void>;
   onUpdateRecepcionDCStatus: (solicitudId: string, status: boolean) => Promise<void>;
   onUpdateEmailMinutaStatus: (solicitudId: string, status: boolean) => Promise<void>;
   onOpenMessageDialog: (solicitudId: string) => void;
+  onOpenMinutaDialog: (solicitudId: string) => void;
   onViewDetails: (solicitud: SolicitudRecord) => void;
   onOpenCommentsDialog: (solicitudId: string) => void;
   onDeleteSolicitud: (solicitudId: string) => void; 
@@ -129,10 +131,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   searchType,
   searchTerm,
   currentUserRole,
+  isMinutaValidationEnabled,
   onUpdatePaymentStatus,
   onUpdateRecepcionDCStatus,
   onUpdateEmailMinutaStatus,
   onOpenMessageDialog,
+  onOpenMinutaDialog,
   onViewDetails,
   onOpenCommentsDialog,
   onDeleteSolicitud, 
@@ -484,11 +488,15 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                           checked={solicitud.paymentStatus === 'Pagado'}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              onUpdatePaymentStatus(solicitud.solicitudId, 'Pagado');
+                              if (isMinutaValidationEnabled) {
+                                onOpenMinutaDialog(solicitud.solicitudId);
+                              } else {
+                                handleSaveMinuta(solicitud.solicitudId); 
+                              }
                             } else {
-                                if (solicitud.paymentStatus === 'Pagado' || (solicitud.paymentStatus && !solicitud.paymentStatus.startsWith('Error:'))) {
-                                    onUpdatePaymentStatus(solicitud.solicitudId, null);
-                                }
+                              if (solicitud.paymentStatus === 'Pagado') {
+                                onUpdatePaymentStatus(solicitud.solicitudId, null);
+                              }
                             }
                           }}
                           aria-label="Marcar como pagado / pendiente"
@@ -497,7 +505,23 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                           <MessageSquare className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </Button>
                         {solicitud.paymentStatus === 'Pagado' && (
+                          <div className="flex items-center space-x-1">
                             <Badge className="bg-green-100 text-green-700 hover:bg-green-200">Pagado</Badge>
+                            {solicitud.minutaNumber && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                      <FileSignature className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="text-xs">
+                                    <p>Minuta No: {solicitud.minutaNumber}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         )}
                         {solicitud.paymentStatus && solicitud.paymentStatus.startsWith('Error:') && (
                             <Badge variant="destructive">{solicitud.paymentStatus}</Badge>
@@ -534,6 +558,20 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                           </Badge>
                         ) : (
                           <Badge variant="outline">Pendiente</Badge>
+                        )}
+                        {solicitud.minutaNumber && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                  <FileSignature className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">
+                                <p>Minuta No: {solicitud.minutaNumber}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                         {(solicitud.paymentStatusLastUpdatedAt || solicitud.paymentStatusLastUpdatedBy) && (
                           <TooltipProvider>
@@ -776,6 +814,11 @@ export default function DatabasePage() {
   const [currentSolicitudIdForMessage, setCurrentSolicitudIdForMessage] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
 
+  const [isMinutaDialogOpen, setIsMinutaDialogOpen] = useState(false);
+  const [currentSolicitudIdForMinuta, setCurrentSolicitudIdForMinuta] = useState<string | null>(null);
+  const [minutaNumberInput, setMinutaNumberInput] = useState('');
+  const IS_MINUTA_VALIDATION_ENABLED = false; 
+
   const [isCommentsDialogOpen, setIsCommentsDialogOpen] = useState(false);
   const [currentSolicitudIdForComments, setCurrentSolicitudIdForComments] = useState<string | null>(null);
   const [comments, setComments] = useState<CommentRecord[]>([]);
@@ -1000,6 +1043,8 @@ export default function DatabasePage() {
         updates.emailMinutaStatus = true; 
         updates.emailMinutaLastUpdatedAt = serverTimestamp();
         updates.emailMinutaLastUpdatedBy = user.email;
+      } else if (newPaymentStatus === null) {
+        updates.minutaNumber = null;
       }
       
       batch.update(docRef, updates);
@@ -1021,6 +1066,8 @@ export default function DatabasePage() {
               updatedSol.emailMinutaStatus = true;
               updatedSol.emailMinutaLastUpdatedAt = new Date();
               updatedSol.emailMinutaLastUpdatedBy = user.email!;
+            } else if (newPaymentStatus === null) {
+              updatedSol.minutaNumber = null;
             }
             return updatedSol;
           }
@@ -1118,6 +1165,74 @@ export default function DatabasePage() {
     setMessageText('');
     setCurrentSolicitudIdForMessage(null);
   };
+
+  const openMinutaDialog = (solicitudId: string) => {
+    const solicitud = fetchedSolicitudes?.find(s => s.solicitudId === solicitudId);
+    setCurrentSolicitudIdForMinuta(solicitudId);
+    setMinutaNumberInput(solicitud?.minutaNumber || '');
+    setIsMinutaDialogOpen(true);
+  };
+
+  const handleSaveMinuta = useCallback(async (solicitudId: string | null = currentSolicitudIdForMinuta, minutaNum: string | null = minutaNumberInput) => {
+    const targetSolicitudId = solicitudId ?? currentSolicitudIdForMinuta;
+    const targetMinutaNum = IS_MINUTA_VALIDATION_ENABLED ? minutaNum : `PAGADO-${new Date().toISOString()}`;
+
+    if (!targetSolicitudId || !user?.email) {
+      toast({ title: "Error", description: "Falta ID de solicitud o usuario.", variant: "destructive" });
+      return;
+    }
+    if (IS_MINUTA_VALIDATION_ENABLED && !targetMinutaNum?.trim()) {
+      toast({ title: "Error", description: "El número de minuta es requerido.", variant: "destructive" });
+      return;
+    }
+
+    const docRef = doc(db, "SolicitudCheques", targetSolicitudId);
+    try {
+      const batch = writeBatch(db);
+      const updates = {
+        paymentStatus: 'Pagado',
+        minutaNumber: targetMinutaNum?.trim() || null,
+        paymentStatusLastUpdatedAt: serverTimestamp(),
+        paymentStatusLastUpdatedBy: user.email,
+        hasOpenUrgentComment: false,
+        emailMinutaStatus: true,
+        emailMinutaLastUpdatedAt: serverTimestamp(),
+        emailMinutaLastUpdatedBy: user.email,
+      };
+      
+      batch.update(docRef, updates);
+      await batch.commit();
+      
+      toast({ title: "Éxito", description: `Solicitud marcada como pagada con minuta ${targetMinutaNum?.trim()}.` });
+
+      setFetchedSolicitudes(prev =>
+        prev?.map(s => {
+          if (s.solicitudId === targetSolicitudId) {
+            return {
+              ...s,
+              paymentStatus: 'Pagado',
+              minutaNumber: targetMinutaNum?.trim() || null,
+              paymentStatusLastUpdatedAt: new Date(),
+              paymentStatusLastUpdatedBy: user.email!,
+              hasOpenUrgentComment: false,
+              emailMinutaStatus: true,
+              emailMinutaLastUpdatedAt: new Date(),
+              emailMinutaLastUpdatedBy: user.email!,
+            };
+          }
+          return s;
+        }) || null
+      );
+    } catch (err) {
+      console.error("Error saving minuta and updating status: ", err);
+      toast({ title: "Error", description: "No se pudo guardar la minuta y actualizar el estado.", variant: "destructive" });
+    } finally {
+      setIsMinutaDialogOpen(false);
+      setMinutaNumberInput('');
+      setCurrentSolicitudIdForMinuta(null);
+    }
+  }, [currentSolicitudIdForMinuta, minutaNumberInput, user, toast, IS_MINUTA_VALIDATION_ENABLED]);
+
 
   const openCommentsDialog = async (solicitudId: string) => {
     setCurrentSolicitudIdForComments(solicitudId);
@@ -1459,6 +1574,7 @@ export default function DatabasePage() {
             paymentStatus: docData.paymentStatus || null,
             paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
             paymentStatusLastUpdatedBy: docData.paymentStatusLastUpdatedBy || null,
+            minutaNumber: docData.minutaNumber || null,
             recepcionDCStatus: docData.recepcionDCStatus ?? false,
             recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
             recepcionDCLastUpdatedBy: docData.recepcionDCLastUpdatedBy || null,
@@ -1566,7 +1682,7 @@ export default function DatabasePage() {
     toast({ title: "Exportando...", description: "Preparando datos para Excel, esto puede tardar unos segundos...", duration: 10000 });
 
     const headers = [
-      "Estado de Pago", "Recepción Doc.", "Recepción Doc. Por", "Recepción Doc. Fecha", "Email Minuta", "Email Minuta Por", "Email Minuta Fecha", "ID Solicitud", "Fecha", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
+      "Estado de Pago", "No. Minuta", "Recepción Doc.", "Recepción Doc. Por", "Recepción Doc. Fecha", "Email Minuta", "Email Minuta Por", "Email Minuta Fecha", "ID Solicitud", "Fecha", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
       "Cantidad en Letras", "Destinatario Solicitud",
       "Unidad Recaudadora", "Código 1", "Codigo MUR", "Banco", "Otro Banco", "Número de Cuenta", "Moneda de la Cuenta", "Otra Moneda Cuenta",
       "Elaborar Cheque A", "Elaborar Transferencia A",
@@ -1603,6 +1719,7 @@ export default function DatabasePage() {
 
       return {
         "Estado de Pago": s.paymentStatus || 'Pendiente',
+        "No. Minuta": s.minutaNumber || 'N/A',
         "Recepción Doc.": s.recepcionDCStatus ? 'Recibido' : 'Pendiente',
         "Recepción Doc. Por": s.recepcionDCLastUpdatedBy || 'N/A',
         "Recepción Doc. Fecha": s.recepcionDCLastUpdatedAt && s.recepcionDCLastUpdatedAt instanceof Date ? format(s.recepcionDCLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
@@ -1750,7 +1867,7 @@ export default function DatabasePage() {
   return (
     <AppShell>
       <div className="py-2 md:py-5">
-        <Card className="w-full max-w-7xl mx-auto custom-shadow">
+        <Card className="w-full custom-shadow">
           <CardHeader>
             <CardTitle className="text-2xl font-semibold text-foreground">Base de Datos de Solicitudes de Cheque</CardTitle>
             <CardDescription className="text-muted-foreground">Seleccione un tipo de búsqueda e ingrese los criterios.</CardDescription>
@@ -1853,10 +1970,12 @@ export default function DatabasePage() {
                 searchType={searchType}
                 searchTerm={currentSearchTermForDisplay}
                 currentUserRole={user?.role}
+                isMinutaValidationEnabled={IS_MINUTA_VALIDATION_ENABLED}
                 onUpdatePaymentStatus={handleUpdatePaymentStatus}
                 onUpdateRecepcionDCStatus={handleUpdateRecepcionDCStatus}
                 onUpdateEmailMinutaStatus={handleUpdateEmailMinutaStatus}
                 onOpenMessageDialog={openMessageDialog}
+                onOpenMinutaDialog={openMinutaDialog}
                 onViewDetails={handleViewDetailsInline}
                 onOpenCommentsDialog={openCommentsDialog}
                 onDeleteSolicitud={handleDeleteSolicitudRequest} 
@@ -1919,6 +2038,32 @@ export default function DatabasePage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsMessageDialogOpen(false); setMessageText(''); setCurrentSolicitudIdForMessage(null);}}>Salir</Button>
             <Button onClick={handleSaveMessage}>Guardar Mensaje</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+       {/* Minuta Dialog */}
+      <Dialog open={isMinutaDialogOpen} onOpenChange={setIsMinutaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Pago y Registrar Minuta</DialogTitle>
+            <DialogDescription>
+              Solicitud ID: {currentSolicitudIdForMinuta}. Ingrese el número de minuta para marcar como pagada.
+            </DialogDescription>
+          </DialogHeader>
+           <div className="py-4">
+              <Label htmlFor="minutaNumber" className="text-sm font-medium text-foreground">Número de Minuta</Label>
+              <Input
+                id="minutaNumber"
+                value={minutaNumberInput}
+                onChange={(e) => setMinutaNumberInput(e.target.value)}
+                placeholder="Ej: MIN-12345"
+                className="mt-1"
+              />
+            </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsMinutaDialogOpen(false); setMinutaNumberInput(''); setCurrentSolicitudIdForMinuta(null); }}>Salir</Button>
+            <Button onClick={() => handleSaveMinuta()}>Guardar Minuta</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
