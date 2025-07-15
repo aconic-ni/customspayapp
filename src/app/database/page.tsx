@@ -90,6 +90,7 @@ interface SearchResultsTableProps {
   onUpdateEmailMinutaStatus: (solicitudId: string, status: boolean) => Promise<void>;
   onOpenMessageDialog: (solicitudId: string) => void;
   onOpenMinutaDialog: (solicitudId: string) => void;
+  onSaveMinuta: (solicitudId: string, minutaNum?: string | null) => Promise<void>;
   onViewDetails: (solicitud: SolicitudRecord) => void;
   onOpenCommentsDialog: (solicitudId: string) => void;
   onDeleteSolicitud: (solicitudId: string) => void; 
@@ -137,6 +138,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   onUpdateEmailMinutaStatus,
   onOpenMessageDialog,
   onOpenMinutaDialog,
+  onSaveMinuta,
   onViewDetails,
   onOpenCommentsDialog,
   onDeleteSolicitud, 
@@ -491,7 +493,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                               if (isMinutaValidationEnabled) {
                                 onOpenMinutaDialog(solicitud.solicitudId);
                               } else {
-                                handleSaveMinuta(solicitud.solicitudId); 
+                                onSaveMinuta(solicitud.solicitudId); 
                               }
                             } else {
                               if (solicitud.paymentStatus === 'Pagado') {
@@ -1173,8 +1175,8 @@ export default function DatabasePage() {
     setIsMinutaDialogOpen(true);
   };
 
-  const handleSaveMinuta = useCallback(async (solicitudId: string | null = currentSolicitudIdForMinuta, minutaNum: string | null = minutaNumberInput) => {
-    const targetSolicitudId = solicitudId ?? currentSolicitudIdForMinuta;
+  const handleSaveMinuta = useCallback(async (solicitudId: string, minutaNum?: string | null) => {
+    const targetSolicitudId = solicitudId;
     const targetMinutaNum = IS_MINUTA_VALIDATION_ENABLED ? minutaNum : `PAGADO-${new Date().toISOString()}`;
 
     if (!targetSolicitudId || !user?.email) {
@@ -1231,7 +1233,7 @@ export default function DatabasePage() {
       setMinutaNumberInput('');
       setCurrentSolicitudIdForMinuta(null);
     }
-  }, [currentSolicitudIdForMinuta, minutaNumberInput, user, toast, IS_MINUTA_VALIDATION_ENABLED]);
+  }, [user, toast, IS_MINUTA_VALIDATION_ENABLED]);
 
 
   const openCommentsDialog = async (solicitudId: string) => {
@@ -1976,6 +1978,7 @@ export default function DatabasePage() {
                 onUpdateEmailMinutaStatus={handleUpdateEmailMinutaStatus}
                 onOpenMessageDialog={openMessageDialog}
                 onOpenMinutaDialog={openMinutaDialog}
+                onSaveMinuta={handleSaveMinuta}
                 onViewDetails={handleViewDetailsInline}
                 onOpenCommentsDialog={openCommentsDialog}
                 onDeleteSolicitud={handleDeleteSolicitudRequest} 
@@ -2063,7 +2066,7 @@ export default function DatabasePage() {
             </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsMinutaDialogOpen(false); setMinutaNumberInput(''); setCurrentSolicitudIdForMinuta(null); }}>Salir</Button>
-            <Button onClick={() => handleSaveMinuta()}>Guardar Minuta</Button>
+            <Button onClick={() => handleSaveMinuta(currentSolicitudIdForMinuta, minutaNumberInput)}>Guardar Minuta</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2155,3 +2158,4 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
+
