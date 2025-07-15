@@ -123,6 +123,7 @@ export interface SolicitudRecord {
   paymentStatus: string | null; 
   paymentStatusLastUpdatedAt?: Date;
   paymentStatusLastUpdatedBy: string | null; 
+  minutaNumber?: string | null;
 
   recepcionDCStatus?: boolean;
   recepcionDCLastUpdatedAt?: Date;
