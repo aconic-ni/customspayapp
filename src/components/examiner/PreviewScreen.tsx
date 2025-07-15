@@ -72,7 +72,7 @@ export function PreviewScreen() {
 
   if (!initialContextData) {
     return (
-       <Card className="w-full max-w-5xl mx-auto custom-shadow">
+       <Card className="w-full custom-shadow">
         <CardHeader>
           <CardTitle className="text-xl md:text-2xl font-semibold text-foreground">Vista Previa de la Solicitud de Cheque</CardTitle>
           <CardDescription className="text-muted-foreground">Cargando datos iniciales...</CardDescription>
@@ -106,7 +106,7 @@ export function PreviewScreen() {
   }
 
   return (
-    <Card className="w-full max-w-5xl mx-auto custom-shadow">
+    <Card className="w-full custom-shadow">
       <CardHeader>
         <CardTitle className="text-xl md:text-2xl font-semibold text-foreground">Vista Previa de la Solicitud de Cheque</CardTitle>
         <CardDescription className="text-muted-foreground">Revise la información antes de confirmar.</CardDescription>
