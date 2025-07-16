@@ -2066,7 +2066,12 @@ export default function DatabasePage() {
             </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsMinutaDialogOpen(false); setMinutaNumberInput(''); setCurrentSolicitudIdForMinuta(null); }}>Salir</Button>
-            <Button onClick={() => handleSaveMinuta(currentSolicitudIdForMinuta, minutaNumberInput)}>Guardar Minuta</Button>
+            <Button onClick={() => {
+              if (currentSolicitudIdForMinuta) {
+              handleSaveMinuta(currentSolicitudIdForMinuta, minutaNumberInput);
+            }
+}}>Guardar Minuta</Button>
+            }}>Guardar Minuta</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2158,4 +2163,3 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
-
