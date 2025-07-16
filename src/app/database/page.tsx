@@ -2070,7 +2070,6 @@ export default function DatabasePage() {
               if (currentSolicitudIdForMinuta) {
               handleSaveMinuta(currentSolicitudIdForMinuta, minutaNumberInput);
             }
-}}>Guardar Minuta</Button>
             }}>Guardar Minuta</Button>
           </DialogFooter>
         </DialogContent>
