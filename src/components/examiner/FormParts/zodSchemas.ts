@@ -15,6 +15,13 @@ export const initialDataSchema = z.object({
 // Renamed from InitialInfoFormData
 export type InitialDataFormData = z.infer<typeof initialDataSchema>;
 
+
+const collaboratorSchema = z.object({
+  id: z.string(), // uuid
+  name: z.string().min(1, "Nombre del colaborador es requerido."),
+  number: z.string().min(1, "Número de colaborador es requerido."),
+});
+
 // Zod schema for the "Nueva Solicitud" form (previously productSchema)
 export const solicitudSchema = z.object({
   id: z.string().optional(),
@@ -69,6 +76,10 @@ export const solicitudSchema = z.object({
     return val.split(';').every(email => z.string().email().safeParse(email.trim()).success || email.trim() === '');
   }, "Uno o más correos no son válidos."),
   observation: z.string().optional(),
+
+  // New field for Memorandum collaborators
+  memorandumCollaborators: z.array(collaboratorSchema).optional(),
+
 }).superRefine((data, ctx) => {
   if (data.banco === 'Otros' && !data.bancoOtros?.trim()) {
     ctx.addIssue({
