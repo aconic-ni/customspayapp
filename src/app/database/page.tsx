@@ -127,8 +127,7 @@ interface SearchResultsTableProps {
   duplicateSets: Map<string, string[]>;
   onResolveDuplicate: (key: string, resolution: "validated_not_duplicate" | "deletion_requested") => void;
   resolvedDuplicateKeys: string[]; 
-  permanentlyResolvedDuplicateKeys: string[];
-  onOpenViewErrorDialog: (errorMessage: string) => void;
+  permanentlyResolvedDuplicateKeys: string[]; 
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -178,7 +177,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   onResolveDuplicate,
   resolvedDuplicateKeys,
   permanentlyResolvedDuplicateKeys,
-  onOpenViewErrorDialog,
 }) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -288,7 +286,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                {/*
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado Pago (RH)
                   <Input
@@ -299,7 +296,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                */}
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   RECP. DOCS
                   <Input
@@ -548,9 +544,16 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                           </div>
                         )}
                         {solicitud.paymentStatus && solicitud.paymentStatus.startsWith('Error:') ? (
-                           <button type="button" className="p-0 h-auto bg-transparent border-none" onClick={() => onOpenViewErrorDialog(solicitud.paymentStatus!.substring("Error: ".length))}>
-                            <Badge variant="destructive" className="cursor-pointer">Error</Badge>
-                           </button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="destructive" className="cursor-help">Error</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{solicitud.paymentStatus.substring("Error: ".length)}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                         ) : null}
                         {(!solicitud.paymentStatus || (solicitud.paymentStatus && !solicitud.paymentStatus.startsWith('Error:') && solicitud.paymentStatus !== 'Pagado')) && (
                              <Badge variant="outline">Pendiente</Badge>
@@ -579,11 +582,18 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1"/> Pagado
                           </Badge>
                         ) : solicitud.paymentStatus && solicitud.paymentStatus.startsWith('Error:') ? (
-                           <button type="button" className="p-0 h-auto bg-transparent border-none" onClick={() => onOpenViewErrorDialog(solicitud.paymentStatus!.substring("Error: ".length))}>
-                              <Badge variant="destructive" className="cursor-pointer flex items-center">
-                                  <AlertCircle className="h-3.5 w-3.5 mr-1"/> Error
-                              </Badge>
-                           </button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="destructive" className="cursor-help flex items-center">
+                                    <AlertCircle className="h-3.5 w-3.5 mr-1"/> Error
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{solicitud.paymentStatus.substring("Error: ".length)}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : (
                           <Badge variant="outline">Pendiente</Badge>
                         )}
@@ -620,7 +630,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                       </div>
                     )}
                   </TableCell>
-                  {/*
                    <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                     {solicitud.isMemorandum ? (
                       <Badge className="bg-rose-100 text-rose-700 flex items-center gap-2">
@@ -635,7 +644,6 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                       <Badge variant="secondary" className="text-muted-foreground">N/A</Badge>
                     )}
                   </TableCell>
-                  */}
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                      {currentUserRole === 'calificador' ? (
                         <div className="flex items-center space-x-2">
@@ -859,10 +867,6 @@ export default function DatabasePage() {
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
   const [currentSolicitudIdForMessage, setCurrentSolicitudIdForMessage] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
-  
-  const [isViewErrorDialogOpen, setIsViewErrorDialogOpen] = useState(false);
-  const [errorMessageToView, setErrorMessageToView] = useState('');
-
 
   const [isMinutaDialogOpen, setIsMinutaDialogOpen] = useState(false);
   const [currentSolicitudIdForMinuta, setCurrentSolicitudIdForMinuta] = useState<string | null>(null);
@@ -947,7 +951,7 @@ export default function DatabasePage() {
   };
 
   const filteredSolicitudes = useMemo(() => {
-    if (!fetchedSolicitudes) return null;
+    if (!fetchedSolicitudes) return [];
   
     const applyFilter = (
       data: SolicitudRecord[],
@@ -1043,6 +1047,19 @@ export default function DatabasePage() {
       accumulatedData = accumulatedData.filter(s => duplicateFilterIds.includes(s.solicitudId));
     }
   
+    const hasActiveFilters = [
+      filterEstadoSolicitudInput, filterEstadoPagoInput, filterEstadoPagoRHInput,
+      filterRecpDocsInput, filterNotMinutaInput, filterSolicitudIdInput,
+      filterFechaSolicitudInput, filterNEInput, filterMontoInput,
+      filterConsignatarioInput, filterDeclaracionInput, filterReferenciaInput,
+      filterGuardadoPorInput
+    ].some(filter => filter.trim() !== '');
+  
+    // If there are filters but the result is empty, return the original search data
+    if (hasActiveFilters && accumulatedData.length === 0) {
+      return fetchedSolicitudes; 
+    }
+  
     return accumulatedData;
   }, [
     fetchedSolicitudes,
@@ -1062,7 +1079,7 @@ export default function DatabasePage() {
     user?.role,
     duplicateFilterIds,
   ]);
-  
+
   const hasActiveFilters = useMemo(() => {
     return [
       filterEstadoSolicitudInput, filterEstadoPagoInput, filterEstadoPagoRHInput,
@@ -1079,17 +1096,7 @@ export default function DatabasePage() {
     filterGuardadoPorInput
   ]);
 
-  const displayedSolicitudes = useMemo(() => {
-    if (!fetchedSolicitudes) return [];
-    
-    // If filters are active and the filtered result is empty, return the original full list.
-    if (hasActiveFilters && filteredSolicitudes && filteredSolicitudes.length === 0) {
-      return fetchedSolicitudes;
-    }
-    
-    // Otherwise, return the filtered list (or the full list if no filters are active).
-    return filteredSolicitudes || fetchedSolicitudes;
-  }, [fetchedSolicitudes, filteredSolicitudes, hasActiveFilters]);
+  const displayedSolicitudes = hasActiveFilters ? filteredSolicitudes : (fetchedSolicitudes || []);
 
 
   useEffect(() => {
@@ -1256,11 +1263,6 @@ export default function DatabasePage() {
       setMessageText('');
     }
     setIsMessageDialogOpen(true);
-  };
-  
-  const openViewErrorDialog = (errorMessage: string) => {
-    setErrorMessageToView(errorMessage);
-    setIsViewErrorDialogOpen(true);
   };
 
   const handleSaveMessage = async () => {
@@ -1769,9 +1771,7 @@ export default function DatabasePage() {
       combinedData.sort((a, b) => (b.examDate?.getTime() ?? 0) - (a.examDate?.getTime() ?? 0));
 
       if (combinedData.length > 0) {
-        if (!preserveFilters) {
-            setFetchedSolicitudes(combinedData);
-        }
+        setFetchedSolicitudes(combinedData);
 
         if (combinedData.length > 1) {
           const potentialDuplicatesMap = new Map<string, string[]>();
@@ -1801,7 +1801,10 @@ export default function DatabasePage() {
 
       } else { 
         if (!preserveFilters) {
+           setError("No se encontraron solicitudes para los criterios ingresados."); 
            setFetchedSolicitudes([]);
+        } else {
+           setFetchedSolicitudes(prev => prev || []); 
         }
       }
       
@@ -1824,7 +1827,7 @@ export default function DatabasePage() {
   }, [toast]);
 
   const handleExport = async () => {
-    const dataToUse = displayedSolicitudes || [];
+    const dataToUse = hasActiveFilters ? filteredSolicitudes : (fetchedSolicitudes || []);
     if (dataToUse.length === 0) {
       toast({ title: "Sin Datos", description: "No hay datos para exportar. Realice una búsqueda primero.", variant: "default" });
       return;
@@ -2078,9 +2081,9 @@ export default function DatabasePage() {
               </div>
             )}
             
-            {hasActiveFilters && filteredSolicitudes && fetchedSolicitudes && filteredSolicitudes.length === 0 && (
+            {hasActiveFilters && filteredSolicitudes.length > 0 && fetchedSolicitudes && filteredSolicitudes.length !== fetchedSolicitudes.length && (
                 <div className="mt-4 p-4 bg-yellow-500/10 text-yellow-700 border border-yellow-500/30 rounded-md text-center">
-                    Los filtros aplicados no encontraron coincidencias. Mostrando los resultados de la búsqueda original.
+                    Mostrando {filteredSolicitudes.length} de {fetchedSolicitudes.length} resultados que coinciden con los filtros aplicados.
                 </div>
             )}
 
@@ -2135,7 +2138,7 @@ export default function DatabasePage() {
             {isLoading && <div className="flex justify-center items-center py-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-3 text-muted-foreground">Cargando solicitudes...</p></div>}
             {error && !isLoading && <div className="mt-4 p-4 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-center">{error}</div>}
             
-            {fetchedSolicitudes && (filteredSolicitudes || fetchedSolicitudes).length > 0 && !isLoading &&
+            {fetchedSolicitudes && fetchedSolicitudes.length > 0 && !isLoading &&
               <SearchResultsTable
                 solicitudes={displayedSolicitudes}
                 searchType={searchType}
@@ -2183,18 +2186,12 @@ export default function DatabasePage() {
                 onResolveDuplicate={handleResolveDuplicate}
                 resolvedDuplicateKeys={resolvedDuplicateKeys}
                 permanentlyResolvedDuplicateKeys={permanentlyResolvedDuplicateKeys}
-                onOpenViewErrorDialog={openViewErrorDialog}
               />
             }
             {!fetchedSolicitudes && !isLoading && !error && !currentSearchTermForDisplay && <div className="mt-4 p-4 bg-blue-500/10 text-blue-700 border border-blue-500/30 rounded-md text-center">Seleccione un tipo de búsqueda e ingrese los criterios para ver resultados.</div>}
             {fetchedSolicitudes && fetchedSolicitudes.length === 0 && !isLoading && !error && currentSearchTermForDisplay && (
                 <div className="mt-4 p-4 bg-yellow-500/10 text-yellow-700 border border-yellow-500/30 rounded-md text-center">
                     No se encontraron solicitudes para los criterios de búsqueda ingresados.
-                </div>
-            )}
-            {hasActiveFilters && filteredSolicitudes && fetchedSolicitudes && filteredSolicitudes.length === 0 && (
-                 <div className="mt-4 p-4 bg-yellow-500/10 text-yellow-700 border border-yellow-500/30 rounded-md text-center">
-                    Los filtros aplicados no encontraron coincidencias en la búsqueda actual. Se muestran los resultados de la búsqueda original.
                 </div>
             )}
           </CardContent>
@@ -2218,26 +2215,6 @@ export default function DatabasePage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsMessageDialogOpen(false); setMessageText(''); setCurrentSolicitudIdForMessage(null);}}>Salir</Button>
             <Button onClick={handleSaveMessage}>Guardar Mensaje</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isViewErrorDialogOpen} onOpenChange={setIsViewErrorDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mensaje de Error de la Solicitud</DialogTitle>
-            <DialogDescription>
-              El siguiente error fue registrado para esta solicitud.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={errorMessageToView}
-            readOnly
-            className="mt-2 bg-muted/50 cursor-not-allowed"
-            rows={4}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsViewErrorDialogOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
