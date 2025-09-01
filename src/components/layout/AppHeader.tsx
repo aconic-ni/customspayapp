@@ -2,7 +2,7 @@
 "use client";
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { FileText, LogOut, UserCircle, Database, Coins, CheckSquare } from 'lucide-react'; // Added CheckSquare
+import { FileText, LogOut, UserCircle, Database, Coins, CheckSquare, Briefcase } from 'lucide-react'; // Added Briefcase
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,8 @@ export function AppHeader() {
   const { toast } = useToast();
 
   const isDatabaseAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor' || user.role === 'admin' || user.role === 'autorevisor_plus');
-  const isValidacionesAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'admin'); // autorevisor_plus typically shouldn't access this
+  const isValidacionesAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'admin');
+  const isRecursosHumanosAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'recursosHumanos' || user.role === 'admin');
 
 
   const renderAppIdentity = () => (
@@ -46,6 +47,19 @@ export function AppHeader() {
       });
     }
   };
+  
+  const handleRecursosHumanosNavigation = () => {
+    if (isRecursosHumanosAuthorized) {
+      router.push('/recursoshumanos');
+    } else {
+      toast({
+        title: "Acceso Denegado",
+        description: "Usuario no autorizado para acceder a Recursos Humanos.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   return (
     <header className="bg-card shadow-sm sticky top-0 z-40">
@@ -91,6 +105,17 @@ export function AppHeader() {
                 >
                   <Database className="h-5 w-5" />
                 </Button>
+                 {isRecursosHumanosAuthorized && (
+                   <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleRecursosHumanosNavigation}
+                      className="text-primary hover:bg-red-500 hover:text-white"
+                      aria-label="Ir a Recursos Humanos"
+                    >
+                      <Briefcase className="h-5 w-5" />
+                   </Button>
+                )}
                 {isValidacionesAuthorized && (
                    <Button
                       variant="ghost"
