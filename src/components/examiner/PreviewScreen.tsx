@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useAppContext, SolicitudStep } from '@/context/AppContext';
 import { downloadTxtFile, downloadDetailedExcelFile } from '@/lib/fileExporter';
 import type { SolicitudData, InitialDataContext } from '@/types';
-import { Download, Check, ArrowLeft, User, Landmark, FileText, Banknote, Hash, Users, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, CheckSquare, Square, Settings2 } from 'lucide-react';
+import { Download, Check, ArrowLeft, User, Landmark, FileText, Banknote, Hash, Users, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, CheckSquare, Square, Settings2, StickyNote } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -68,7 +68,7 @@ const getMonedaCuentaDisplayPreview = (solicitud: SolicitudData) => {
 
 
 export function PreviewScreen() {
-  const { initialContextData, solicitudes, setCurrentStep } = useAppContext();
+  const { initialContextData, solicitudes, setCurrentStep, isMemorandumMode } = useAppContext();
 
   if (!initialContextData) {
     return (
@@ -130,9 +130,28 @@ export function PreviewScreen() {
               <div className="space-y-6 pr-4">
                 {solicitudes.map((solicitud, index) => (
                   <div key={solicitud.id} className="p-4 border border-border bg-card rounded-lg shadow">
-                    <h5 className="text-md font-semibold mb-3 text-primary">
-                      Solicitud {index + 1} ({solicitud.id})
+                    <h5 className="text-md font-semibold mb-3 text-primary flex justify-between items-center">
+                      <span>Solicitud {index + 1} ({solicitud.id})</span>
+                      {isMemorandumMode && (
+                        <Badge variant="destructive"><StickyNote className="h-3.5 w-3.5 mr-1.5" />Memorándum</Badge>
+                      )}
                     </h5>
+
+                    {isMemorandumMode && solicitud.memorandumCollaborators && solicitud.memorandumCollaborators.length > 0 && (
+                      <div className="mb-3 p-3 border border-destructive/50 rounded-md bg-destructive/5">
+                        <h6 className="text-sm font-medium text-destructive mb-1">Colaboradores</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+                          {solicitud.memorandumCollaborators.map(collab => (
+                            <div key={collab.id} className="text-xs">
+                              <p><span className="font-semibold">Nombre:</span> {collab.name}</p>
+                              <p><span className="font-semibold">Número:</span> {collab.number}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+
                     <div className="space-y-3 divide-y divide-border/50">
 
                       <div className="pt-2">
