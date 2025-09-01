@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useAppContext, SolicitudStep } from '@/context/AppContext';
 import { CheckCircle, FilePlus, RotateCcw, Save, Mail, Database, X } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, Timestamp as FirestoreTimestamp } from "firebase/firestore"; 
+import { doc, setDoc, Timestamp as FirestoreTimestamp } from "firebase/firestore";
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { SolicitudRecord } from '@/types';
@@ -14,7 +14,7 @@ import { es } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 
 export function SuccessModal() {
-  const { currentStep, setCurrentStep, resetApp, initialContextData, solicitudes } = useAppContext();
+  const { currentStep, setCurrentStep, resetApp, initialContextData, solicitudes, isMemorandumMode } = useAppContext();
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -47,6 +47,8 @@ export function SuccessModal() {
     }
 
     let allSavedSuccessfully = true;
+    const targetCollection = isMemorandumMode ? "Memorandum" : "SolicitudCheques";
+
     try {
       for (const solicitud of solicitudes) {
         if (!solicitud.id) {
@@ -60,11 +62,11 @@ export function SuccessModal() {
             console.warn(`Monto for solicitud ${solicitud.id} was not a valid number, saving as null.`);
         }
 
-        const dataToSave: Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt' | 'recepcionDCLastUpdatedAt' | 'emailMinutaLastUpdatedAt'> & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp | null, recepcionDCLastUpdatedAt?: FirestoreTimestamp | null, emailMinutaLastUpdatedAt?: FirestoreTimestamp | null } = {
+        const dataToSave: Omit<SolicitudRecord, 'examDate' | 'savedAt' | 'paymentStatusLastUpdatedAt' | 'recepcionDCLastUpdatedAt' | 'emailMinutaLastUpdatedAt' | 'rhStatusLastUpdatedAt' | 'rhPaymentDate' | 'rhPaymentStartDate' | 'rhPaymentEndDate' > & { examDate: FirestoreTimestamp, savedAt: FirestoreTimestamp, paymentStatusLastUpdatedAt?: FirestoreTimestamp | null, recepcionDCLastUpdatedAt?: FirestoreTimestamp | null, emailMinutaLastUpdatedAt?: FirestoreTimestamp | null, rhStatusLastUpdatedAt?: FirestoreTimestamp | null, rhPaymentDate?: FirestoreTimestamp | null, rhPaymentStartDate?: FirestoreTimestamp | null, rhPaymentEndDate?: FirestoreTimestamp | null } = {
           examNe: initialContextData.ne,
           examReference: initialContextData.reference || null,
           examManager: initialContextData.manager,
-          examDate: FirestoreTimestamp.fromDate(initialContextData.date), 
+          examDate: FirestoreTimestamp.fromDate(initialContextData.date),
           examRecipient: initialContextData.recipient,
 
           solicitudId: solicitud.id,
@@ -104,31 +106,43 @@ export function SuccessModal() {
           correo: solicitud.correo || null,
           observation: solicitud.observation || null,
 
-          savedAt: FirestoreTimestamp.fromDate(new Date()), 
+          isMemorandum: isMemorandumMode,
+          memorandumCollaborators: solicitud.memorandumCollaborators || [],
+
+          savedAt: FirestoreTimestamp.fromDate(new Date()),
           savedBy: user.email,
-          
-          paymentStatus: null, 
+
+          paymentStatus: null,
           paymentStatusLastUpdatedBy: null,
           paymentStatusLastUpdatedAt: null,
 
-          recepcionDCStatus: false, 
+          recepcionDCStatus: false,
           recepcionDCLastUpdatedBy: null,
           recepcionDCLastUpdatedAt: null,
 
           emailMinutaStatus: false,
           emailMinutaLastUpdatedBy: null,
           emailMinutaLastUpdatedAt: null,
+
+          rhPaymentStatus: 'caso_no_iniciado',
+          rhPaymentOtherDetails: null,
+          rhPaymentDate: null,
+          rhPaymentStartDate: null,
+          rhPaymentEndDate: null,
+          rhStatusLastUpdatedAt: null,
+          rhStatusLastUpdatedBy: null,
+
           commentsCount: 0,
         };
 
-        const solicitudDocRef = doc(db, "SolicitudCheques", solicitud.id);
+        const solicitudDocRef = doc(db, targetCollection, solicitud.id);
         await setDoc(solicitudDocRef, dataToSave);
       }
 
       if (allSavedSuccessfully) {
         toast({
           title: "Solicitudes Guardadas",
-          description: `Todas las solicitudes (${solicitudes.length}) han sido guardadas en la base de datos.`,
+          description: `Todas las solicitudes (${solicitudes.length}) han sido guardadas en la colección: ${targetCollection}.`,
         });
       } else {
         toast({
@@ -139,7 +153,7 @@ export function SuccessModal() {
       }
 
     } catch (error: any) {
-      console.error("Error saving solicituds to Firestore: ", error);
+      console.error(`Error saving solicituds to Firestore collection ${targetCollection}: `, error);
       allSavedSuccessfully = false;
       toast({
         title: "Error al Guardar",
@@ -160,8 +174,8 @@ export function SuccessModal() {
     }
 
     const destinatario = "grupocontabilidad@aconic.com.ni, harol.ampie@aconic.com.ni, seguimiento@aconic.com.ni";
-    const asunto = `Solicitud de Cheque - NE: ${initialContextData.ne || 'N/A'}`;
-    
+    const asunto = `${isMemorandumMode ? 'Memorandum' : 'Solicitud de Cheque'} - NE: ${initialContextData.ne || 'N/A'}`;
+
     const fechaSolicitud = initialContextData.date ? format(new Date(initialContextData.date), "PPP", { locale: es }) : 'Fecha no especificada';
     const userName = initialContextData.manager || 'Usuario no especificado';
     const solicitudIDs = solicitudes.map(s => s.id).join(', ') || 'ninguna solicitud';
@@ -169,7 +183,7 @@ export function SuccessModal() {
     const referencia = initialContextData.reference || 'N/A';
 
     let cuerpo = `Buen día Contabilidad;\n${fechaSolicitud}\n\n`;
-    cuerpo += `Por este medio, yo ${userName}, he generado ID de Solicitud No. (${solicitudIDs}) debidamente guardadas en CustomsFA-L, Sistema de Gestión de Pagos de ACONIC, solicito su apoyo validando la operación en su integración de sistema local, se entrega Solicitud de Cheque física firmada.\n\n`;
+    cuerpo += `Por este medio, yo ${userName}, he generado ID de ${isMemorandumMode ? 'Memorandum' : 'Solicitud'} No. (${solicitudIDs}) debidamente guardadas en CustomsFA-L, Sistema de Gestión de Pagos de ACONIC, solicito su apoyo validando la operación en su integración de sistema local, se entrega ${isMemorandumMode ? 'Memorandum' : 'Solicitud de Cheque'} física firmada.\n\n`;
     cuerpo += `NE: ${ne}\n`;
     cuerpo += `Referencia: ${referencia}\n\n`;
     cuerpo += `Sin más a que hacer referencia.\n\n`;
@@ -180,7 +194,7 @@ export function SuccessModal() {
   };
 
   const handleGoToDatabase = () => {
-    const authorizedRolesForDatabase = ['revisor', 'calificador', 'admin', 'autorevisor_plus'];
+    const authorizedRolesForDatabase = ['revisor', 'calificador', 'admin', 'autorevisor_plus', 'autorevisor']; // Added 'autorevisor'
     if (user && user.role && authorizedRolesForDatabase.includes(user.role)) {
       router.push('/database');
     } else {
@@ -197,12 +211,12 @@ export function SuccessModal() {
   }
 
   return (
-    <Dialog 
-        open={currentStep === SolicitudStep.SUCCESS} 
-        onOpenChange={(open) => { 
+    <Dialog
+        open={currentStep === SolicitudStep.SUCCESS}
+        onOpenChange={(open) => {
             if (!open) {
                 setCurrentStep(SolicitudStep.PREVIEW);
-            } 
+            }
         }}
     >
       <DialogContent className="sm:max-w-md">
@@ -237,24 +251,24 @@ export function SuccessModal() {
               <Save className="h-5 w-5 text-destructive-foreground" />
             </Button>
             <Button onClick={() => setCurrentStep(SolicitudStep.PREVIEW)} variant="outline" size="default" className="w-full sm:w-auto">
-               <RotateCcw className="mr-2 h-4 w-4" /> Revisar Solicitud      
+               <RotateCcw className="mr-2 h-4 w-4" /> Revisar Solicitud
             </Button>
             <Button onClick={() => resetApp()} className="btn-primary w-full sm:w-auto" size="default">
               <FilePlus className="mr-2 h-4 w-4" /> Empezar Nuevo
             </Button>
           </div>
-          <Button 
-            onClick={enviarCorreo} 
-            variant="default" 
-            size="default" 
+          <Button
+            onClick={enviarCorreo}
+            variant="default"
+            size="default"
             className="w-full btn-secondary mt-3"
           >
             <Mail className="mr-2 h-4 w-4" /> Enviar Correo
           </Button>
-          <Button 
-            onClick={handleGoToDatabase} 
-            variant="default" 
-            size="default" 
+          <Button
+            onClick={handleGoToDatabase}
+            variant="default"
+            size="default"
             className="w-full bg-purple-600 text-white hover:bg-purple-700"
           >
             <Database className="mr-2 h-4 w-4" /> Ir a base de datos
