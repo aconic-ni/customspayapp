@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2 } from 'lucide-react';
+import { ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2, StickyNote } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -128,11 +128,18 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
                             style={{ width: `${(solicitud.id.length * 0.55) + 1}em`, minWidth: '10em' }} 
                         />
                     </div>
-                    {solicitud.soporte && (
-                        <Badge className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-md border border-gray-300 print:border-gray-400 hover:bg-green-600 hover:text-white">
-                        PAGADA
-                        </Badge>
-                    )}
+                     <div className="flex items-center gap-2">
+                        {solicitud.isMemorandum && (
+                           <Badge variant="destructive" className="text-sm font-semibold px-3 py-1">
+                            <StickyNote className="h-4 w-4 mr-1.5" /> Memorándum
+                          </Badge>
+                        )}
+                        {solicitud.soporte && (
+                            <Badge className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-md border border-gray-300 print:border-gray-400 hover:bg-green-600 hover:text-white">
+                            PAGADA
+                            </Badge>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -146,6 +153,21 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
                   <DetailItem label="Referencia" value={initialData.reference || 'N/A'} icon={FileText} className="md:col-span-2"/>
                 </div>
               </div>
+
+            {solicitud.isMemorandum && solicitud.memorandumCollaborators && solicitud.memorandumCollaborators.length > 0 && (
+                <div className="mb-3 p-4 border border-destructive/50 rounded-md bg-destructive/5 card-print-styles">
+                    <h3 className="text-lg font-semibold mb-2 text-destructive">Colaboradores del Memorándum</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                        {solicitud.memorandumCollaborators.map(collab => (
+                            <div key={collab.id} className="p-2 border-b border-destructive/20">
+                                <DetailItem label="Nombre" value={collab.name} icon={User} />
+                                <DetailItem label="Número Colaborador" value={collab.number} icon={Hash} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
 
             <div className="mb-3 p-4 border border-border rounded-md bg-secondary/30 card-print-styles">
               <p className="text-sm font-medium text-muted-foreground mb-2">
@@ -260,5 +282,3 @@ export default function SolicitudDetailView({ solicitud, initialData, onBackToLi
   );
 }
 
-
-    
