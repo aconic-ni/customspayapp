@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw, AlertTriangle, ShieldCheck, Trash2, FileSignature } from 'lucide-react';
+import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, CheckSquare as CheckSquareIcon, MessageSquareText, RotateCw, AlertTriangle, ShieldCheck, Trash2, FileSignature, Briefcase } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, addDoc, getCountFromServer, writeBatch, deleteDoc, type QueryConstraint, setDoc } from 'firebase/firestore';
 import type { SolicitudRecord, CommentRecord, ValidacionRecord, DeletionAuditEvent } from '@/types';
@@ -66,6 +66,7 @@ const formatCurrencyFetched = (amount?: number | string | null, currency?: strin
 
 const renderSolicitudStatusBadges = (solicitud: SolicitudRecord) => {
   const badges = [];
+  if (solicitud.isMemorandum) badges.push(<Badge key="memo" variant="destructive" className="whitespace-nowrap text-xs">Memorandum</Badge>);
   if (solicitud.documentosAdjuntos) badges.push(<Badge key="docs" variant="outline" className="bg-blue-100 text-blue-700 whitespace-nowrap text-xs">Docs Adjuntos</Badge>);
   if (solicitud.soporte) badges.push(<Badge key="soporte" variant="outline" className="bg-amber-100 text-amber-700 whitespace-nowrap text-xs">Soporte</Badge>);
   if (solicitud.impuestosPendientesCliente) badges.push(<Badge key="impuestos" variant="outline" className="bg-red-100 text-red-700 whitespace-nowrap text-xs">Imp. Pendientes</Badge>);
@@ -106,6 +107,8 @@ interface SearchResultsTableProps {
   setFilterNEInput: (value: string) => void;
   filterEstadoPagoInput: string;
   setFilterEstadoPagoInput: (value: string) => void;
+  filterEstadoPagoRHInput: string;
+  setFilterEstadoPagoRHInput: (value: string) => void;
   filterFechaSolicitudInput: string;
   setFilterFechaSolicitudInput: (value: string) => void;
   filterMontoInput: string;
@@ -154,6 +157,8 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   setFilterNEInput,
   filterEstadoPagoInput,
   setFilterEstadoPagoInput,
+  filterEstadoPagoRHInput,
+  setFilterEstadoPagoRHInput,
   filterFechaSolicitudInput,
   setFilterFechaSolicitudInput,
   filterMontoInput,
@@ -282,6 +287,16 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   />
                 </TableHead>
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                  Estado Pago (RH)
+                  <Input
+                    type="text"
+                    placeholder="Filtrar Estado RH..."
+                    value={filterEstadoPagoRHInput}
+                    onChange={(e) => setFilterEstadoPagoRHInput(e.target.value)}
+                    className="mt-1 h-8 text-xs"
+                  />
+                </TableHead>
+                <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   RECP. DOCS
                   <Input
                     type="text"
@@ -291,6 +306,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
+                {/*
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   NOT. MINUTA
                   <Input
@@ -301,6 +317,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
+                */}
                  <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado Solicitud
                   <Input
@@ -493,7 +510,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                               if (isMinutaValidationEnabled) {
                                 onOpenMinutaDialog(solicitud.solicitudId);
                               } else {
-                                onSaveMinuta(solicitud.solicitudId); 
+                                onSaveMinuta(solicitud.solicitudId, null); 
                               }
                             } else {
                               if (solicitud.paymentStatus === 'Pagado') {
@@ -501,9 +518,10 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                               }
                             }
                           }}
+                          disabled={solicitud.isMemorandum}
                           aria-label="Marcar como pagado / pendiente"
                         />
-                        <Button variant="ghost" size="icon" onClick={() => onOpenMessageDialog(solicitud.solicitudId)} aria-label="Añadir mensaje de error" className="h-7 w-7 p-0">
+                        <Button variant="ghost" size="icon" onClick={() => onOpenMessageDialog(solicitud.solicitudId)} aria-label="Añadir mensaje de error" className="h-7 w-7 p-0" disabled={solicitud.isMemorandum}>
                           <MessageSquare className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </Button>
                         {solicitud.paymentStatus === 'Pagado' && (
@@ -594,6 +612,20 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                       </div>
                     )}
                   </TableCell>
+                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
+                    {solicitud.isMemorandum ? (
+                      <Badge className="bg-rose-100 text-rose-700 flex items-center gap-2">
+                        <Briefcase className="h-3.5 w-3.5"/>
+                        {solicitud.rhPaymentStatus === 'caso_no_iniciado' ? 'Caso no iniciado' :
+                         solicitud.rhPaymentStatus === 'pagado_efectivo' ? 'Pagado Efectivo' :
+                         solicitud.rhPaymentStatus === 'proceso_deduccion' ? 'En Deducción' :
+                         solicitud.rhPaymentStatus === 'otros' ? `Otros: ${solicitud.rhPaymentOtherDetails || 'N/A'}` :
+                         'En Trámite RH'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="ghost" className="text-muted-foreground">N/A</Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                      {currentUserRole === 'calificador' ? (
                         <div className="flex items-center space-x-2">
@@ -656,6 +688,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                         </div>
                      )}
                   </TableCell>
+                  {/*
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                     {currentUserRole === 'calificador' ? (
                       <div className="flex items-center space-x-2">
@@ -718,6 +751,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                       </div>
                     )}
                   </TableCell>
+                  */}
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                     {renderSolicitudStatusBadges(solicitud)}
                   </TableCell>
@@ -837,6 +871,7 @@ export default function DatabasePage() {
   const [filterSolicitudIdInput, setFilterSolicitudIdInput] = useState('');
   const [filterNEInput, setFilterNEInput] = useState('');
   const [filterEstadoPagoInput, setFilterEstadoPagoInput] = useState('');
+  const [filterEstadoPagoRHInput, setFilterEstadoPagoRHInput] = useState('');
   const [filterFechaSolicitudInput, setFilterFechaSolicitudInput] = useState('');
   const [filterMontoInput, setFilterMontoInput] = useState('');
   const [filterConsignatarioInput, setFilterConsignatarioInput] = useState('');
@@ -909,12 +944,12 @@ export default function DatabasePage() {
     ): SolicitudRecord[] => {
         if (!filterValue.trim()) return data;
         const searchTerm = filterValue.toLowerCase().trim();
-        const filtered = data.filter(item => filterFn(item, searchTerm));
-        return filtered.length > 0 || data.length === 0 ? filtered : data;
+        return data.filter(item => filterFn(item, searchTerm));
     };
 
     accumulatedData = applyFilter(accumulatedData, filterEstadoSolicitudInput, (s, term) => {
         const badgeTexts: string[] = [];
+        if (s.isMemorandum) badgeTexts.push("Memorandum");
         if (s.documentosAdjuntos) badgeTexts.push("Docs Adjuntos");
         if (s.soporte) badgeTexts.push("Soporte");
         if (s.impuestosPendientesCliente) badgeTexts.push("Imp. Pendientes");
@@ -927,6 +962,17 @@ export default function DatabasePage() {
     accumulatedData = applyFilter(accumulatedData, filterEstadoPagoInput, (s, term) =>
         (s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente").includes(term)
     );
+    accumulatedData = applyFilter(accumulatedData, filterEstadoPagoRHInput, (s, term) => {
+        if (!s.isMemorandum) return false;
+        const statusMap: { [key: string]: string } = {
+          'caso_no_iniciado': 'caso no iniciado',
+          'pagado_efectivo': 'pagado efectivo',
+          'proceso_deduccion': 'en deduccion',
+          'otros': 'otros',
+        };
+        const rhStatusText = s.rhPaymentStatus ? (statusMap[s.rhPaymentStatus] || s.rhPaymentStatus) : 'en trámite rh';
+        return rhStatusText.includes(term);
+    });
     accumulatedData = applyFilter(accumulatedData, filterRecpDocsInput, (s, term) => {
         const statusText = s.recepcionDCStatus ? "recibido" : "pendiente";
         return statusText.includes(term);
@@ -975,6 +1021,7 @@ export default function DatabasePage() {
     fetchedSolicitudes,
     filterEstadoSolicitudInput,
     filterEstadoPagoInput,
+    filterEstadoPagoRHInput,
     filterRecpDocsInput,
     filterNotMinutaInput,
     filterSolicitudIdInput,
@@ -996,7 +1043,7 @@ export default function DatabasePage() {
       let notMinutaPend = 0;
 
       displayedSolicitudes.forEach(s => {
-        if (!s.paymentStatus || (s.paymentStatus && !s.paymentStatus.startsWith('Error:') && s.paymentStatus !== 'Pagado')) {
+        if (!s.isMemorandum && (!s.paymentStatus || (s.paymentStatus && !s.paymentStatus.startsWith('Error:') && s.paymentStatus !== 'Pagado'))) {
           paymentPend++;
         }
         if (!s.recepcionDCStatus) {
@@ -1011,7 +1058,7 @@ export default function DatabasePage() {
       setPendingNotMinutaCount(notMinutaPend);
 
       const distinctPend = displayedSolicitudes.filter(s =>
-          (!s.paymentStatus || (s.paymentStatus && !s.paymentStatus.startsWith('Error:') && s.paymentStatus !== 'Pagado')) ||
+          (!s.isMemorandum && (!s.paymentStatus || (s.paymentStatus && !s.paymentStatus.startsWith('Error:') && s.paymentStatus !== 'Pagado'))) ||
           !s.recepcionDCStatus ||
           !s.emailMinutaStatus
       ).length;
@@ -1243,8 +1290,11 @@ export default function DatabasePage() {
     setIsLoadingComments(true);
     setIsCommentsDialogOpen(true);
 
+    const solicitud = fetchedSolicitudes?.find(s => s.solicitudId === solicitudId);
+    const collectionName = solicitud?.isMemorandum ? "Memorandum" : "SolicitudCheques";
+
     try {
-      const commentsCollectionRef = collection(db, "SolicitudCheques", solicitudId, "comments");
+      const commentsCollectionRef = collection(db, collectionName, solicitudId, "comments");
       const q = query(commentsCollectionRef, orderBy("createdAt", "asc"));
       const querySnapshot = await getDocs(q);
       const fetchedComments = querySnapshot.docs.map(docSnap => {
@@ -1283,8 +1333,12 @@ export default function DatabasePage() {
       return;
     }
     setIsPostingComment(true);
+
+    const solicitud = fetchedSolicitudes?.find(s => s.solicitudId === currentSolicitudIdForComments);
+    const collectionName = solicitud?.isMemorandum ? "Memorandum" : "SolicitudCheques";
+
     try {
-      const commentsCollectionRef = collection(db, "SolicitudCheques", currentSolicitudIdForComments, "comments");
+      const commentsCollectionRef = collection(db, collectionName, currentSolicitudIdForComments, "comments");
       const newCommentData: Omit<CommentRecord, 'id' | 'createdAt'> & { createdAt: any } = {
         solicitudId: currentSolicitudIdForComments,
         text: newCommentText.trim(),
@@ -1296,7 +1350,7 @@ export default function DatabasePage() {
 
       let newHasOpenUrgentCommentFlag: boolean | undefined = undefined;
       if (isNewCommentUrgent) { 
-        const solicitudDocRef = doc(db, "SolicitudCheques", currentSolicitudIdForComments);
+        const solicitudDocRef = doc(db, collectionName, currentSolicitudIdForComments);
         await updateDoc(solicitudDocRef, { hasOpenUrgentComment: true });
         newHasOpenUrgentCommentFlag = true;
       }
@@ -1380,13 +1434,16 @@ export default function DatabasePage() {
       setIsDeleteDialogOpen(false);
       return;
     }
+    
+    const solicitud = fetchedSolicitudes?.find(s => s.solicitudId === solicitudToDeleteId);
+    const collectionName = solicitud?.isMemorandum ? "Memorandum" : "SolicitudCheques";
 
-    const originalDocRef = doc(db, "SolicitudCheques", solicitudToDeleteId);
+    const originalDocRef = doc(db, collectionName, solicitudToDeleteId);
     
     try {
       const originalDocSnap = await getDoc(originalDocRef);
       if (!originalDocSnap.exists()) {
-        toast({ title: "Error", description: `La solicitud ${solicitudToDeleteId} no existe.`, variant: "destructive" });
+        toast({ title: "Error", description: `La solicitud ${solicitudToDeleteId} no existe en ${collectionName}.`, variant: "destructive" });
         setIsDeleteDialogOpen(false);
         return;
       }
@@ -1475,6 +1532,7 @@ export default function DatabasePage() {
     if (!preserveFilters) {
       setFilterEstadoSolicitudInput('');
       setFilterEstadoPagoInput('');
+      setFilterEstadoPagoRHInput('');
       setFilterRecpDocsInput('');
       setFilterNotMinutaInput('');
       setFilterSolicitudIdInput('');
@@ -1558,10 +1616,15 @@ export default function DatabasePage() {
           const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
           const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
           const emailMinutaLastUpdatedAt = docData.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? docData.emailMinutaLastUpdatedAt.toDate() : (docData.emailMinutaLastUpdatedAt instanceof Date ? docData.emailMinutaLastUpdatedAt : undefined);
+          const rhPaymentDate = docData.rhPaymentDate instanceof FirestoreTimestamp ? docData.rhPaymentDate.toDate() : (docData.rhPaymentDate instanceof Date ? docData.rhPaymentDate : undefined);
+          const rhPaymentStartDate = docData.rhPaymentStartDate instanceof FirestoreTimestamp ? docData.rhPaymentStartDate.toDate() : (docData.rhPaymentStartDate instanceof Date ? docData.rhPaymentStartDate : undefined);
+          const rhPaymentEndDate = docData.rhPaymentEndDate instanceof FirestoreTimestamp ? docData.rhPaymentEndDate.toDate() : (docData.rhPaymentEndDate instanceof Date ? docData.rhPaymentEndDate : undefined);
+
 
           let commentsCount = 0;
           try {
-            const commentsColRef = collection(db, "SolicitudCheques", docSnap.id, "comments");
+            const collectionName = docData.isMemorandum ? "Memorandum" : "SolicitudCheques";
+            const commentsColRef = collection(db, collectionName, docSnap.id, "comments");
             const commentsSnapshot = await getCountFromServer(commentsColRef);
             commentsCount = commentsSnapshot.data().count;
           } catch (countError) {
@@ -1622,6 +1685,15 @@ export default function DatabasePage() {
             savedBy: docData.savedBy || null,
             commentsCount: commentsCount,
             hasOpenUrgentComment: docData.hasOpenUrgentComment ?? false,
+            isMemorandum: docData.isMemorandum ?? false,
+            memorandumCollaborators: docData.memorandumCollaborators || [],
+            rhPaymentStatus: docData.rhPaymentStatus || null,
+            rhPaymentOtherDetails: docData.rhPaymentOtherDetails || null,
+            rhPaymentDate: rhPaymentDate,
+            rhPaymentStartDate: rhPaymentStartDate,
+            rhPaymentEndDate: rhPaymentEndDate,
+            rhStatusLastUpdatedBy: docData.rhStatusLastUpdatedBy || null,
+            rhStatusLastUpdatedAt: docData.rhStatusLastUpdatedAt ? (docData.rhStatusLastUpdatedAt as FirestoreTimestamp).toDate() : undefined,
           } as SolicitudRecord;
         });
 
@@ -1684,7 +1756,7 @@ export default function DatabasePage() {
     toast({ title: "Exportando...", description: "Preparando datos para Excel, esto puede tardar unos segundos...", duration: 10000 });
 
     const headers = [
-      "Estado de Pago", "No. Minuta", "Recepción Doc.", "Recepción Doc. Por", "Recepción Doc. Fecha", "Email Minuta", "Email Minuta Por", "Email Minuta Fecha", "ID Solicitud", "Fecha", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
+      "Estado de Pago", "No. Minuta", "Estado Pago (RH)", "Detalle Otro (RH)", "Fecha Pago (RH)", "Fecha Inicio Pago (RH)", "Fecha Fin Pago (RH)", "Recepción Doc.", "Recepción Doc. Por", "Recepción Doc. Fecha", "Email Minuta", "Email Minuta Por", "Email Minuta Fecha", "ID Solicitud", "Tipo", "Fecha", "NE", "Monto", "Moneda Monto", "Consignatario", "Declaracion", "Referencia", "Guardado Por",
       "Cantidad en Letras", "Destinatario Solicitud",
       "Unidad Recaudadora", "Código 1", "Codigo MUR", "Banco", "Otro Banco", "Número de Cuenta", "Moneda de la Cuenta", "Otra Moneda Cuenta",
       "Elaborar Cheque A", "Elaborar Transferencia A",
@@ -1693,14 +1765,15 @@ export default function DatabasePage() {
       "Constancias de No Retención", "Constancia 1%", "Constancia 2%",
       "Pago de Servicios", "Tipo de Servicio", "Otro Tipo de Servicio", "Factura Servicio", "Institución Servicio",
       "Correo Notificación", "Observación", "Usuario (De)",
-      "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)", "Comentarios", "Comentario Urgente Abierto"
+      "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)", "Actualizado Por (RH)", "Fecha Actualización (RH)", "Comentarios", "Comentario Urgente Abierto"
     ];
 
     const dataToExportPromises = dataToUse.map(async (s) => {
       let commentsString = 'N/A';
       if (s.commentsCount && s.commentsCount > 0) {
         try {
-            const commentsCollectionRef = collection(db, "SolicitudCheques", s.solicitudId, "comments");
+            const collectionName = s.isMemorandum ? "Memorandum" : "SolicitudCheques";
+            const commentsCollectionRef = collection(db, collectionName, s.solicitudId, "comments");
             const q = query(commentsCollectionRef, orderBy("createdAt", "asc"));
             const querySnapshot = await getDocs(q);
             if (!querySnapshot.empty) {
@@ -1718,10 +1791,22 @@ export default function DatabasePage() {
         commentsString = 'Sin comentarios';
       }
 
+      const rhStatusMap: { [key: string]: string } = {
+        'caso_no_iniciado': 'Caso no iniciado',
+        'pagado_efectivo': 'Pagado Efectivo',
+        'proceso_deduccion': 'En proceso de deducción',
+        'otros': 'Otros',
+      };
+
 
       return {
         "Estado de Pago": s.paymentStatus || 'Pendiente',
         "No. Minuta": s.minutaNumber || 'N/A',
+        "Estado Pago (RH)": s.isMemorandum ? (rhStatusMap[s.rhPaymentStatus || ''] || 'N/A') : 'N/A',
+        "Detalle Otro (RH)": s.isMemorandum && s.rhPaymentStatus === 'otros' ? s.rhPaymentOtherDetails : 'N/A',
+        "Fecha Pago (RH)": s.isMemorandum && s.rhPaymentDate ? format(s.rhPaymentDate, "yyyy-MM-dd", { locale: es }) : 'N/A',
+        "Fecha Inicio Pago (RH)": s.isMemorandum && s.rhPaymentStartDate ? format(s.rhPaymentStartDate, "yyyy-MM-dd", { locale: es }) : 'N/A',
+        "Fecha Fin Pago (RH)": s.isMemorandum && s.rhPaymentEndDate ? format(s.rhPaymentEndDate, "yyyy-MM-dd", { locale: es }) : 'N/A',
         "Recepción Doc.": s.recepcionDCStatus ? 'Recibido' : 'Pendiente',
         "Recepción Doc. Por": s.recepcionDCLastUpdatedBy || 'N/A',
         "Recepción Doc. Fecha": s.recepcionDCLastUpdatedAt && s.recepcionDCLastUpdatedAt instanceof Date ? format(s.recepcionDCLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
@@ -1729,6 +1814,7 @@ export default function DatabasePage() {
         "Email Minuta Por": s.emailMinutaLastUpdatedBy || 'N/A',
         "Email Minuta Fecha": s.emailMinutaLastUpdatedAt && s.emailMinutaLastUpdatedAt instanceof Date ? format(s.emailMinutaLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "ID Solicitud": s.solicitudId,
+        "Tipo": s.isMemorandum ? 'Memorandum' : 'Solicitud Cheque',
         "Fecha": s.examDate instanceof Date ? format(s.examDate, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "NE": s.examNe,
         "Monto": s.monto,
@@ -1771,6 +1857,8 @@ export default function DatabasePage() {
         "Fecha de Guardado": s.savedAt instanceof Date ? format(s.savedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "Actualizado Por (Pago)": s.paymentStatusLastUpdatedBy || 'N/A',
         "Fecha Actualización (Pago)": s.paymentStatusLastUpdatedAt && s.paymentStatusLastUpdatedAt instanceof Date ? format(s.paymentStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
+        "Actualizado Por (RH)": s.rhStatusLastUpdatedBy || 'N/A',
+        "Fecha Actualización (RH)": s.rhStatusLastUpdatedAt && s.rhStatusLastUpdatedAt instanceof Date ? format(s.rhStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "Comentarios": commentsString,
         "Comentario Urgente Abierto": s.hasOpenUrgentComment ? 'Sí' : 'No',
       };
@@ -1994,6 +2082,8 @@ export default function DatabasePage() {
                 setFilterNEInput={setFilterNEInput}
                 filterEstadoPagoInput={filterEstadoPagoInput}
                 setFilterEstadoPagoInput={setFilterEstadoPagoInput}
+                filterEstadoPagoRHInput={filterEstadoPagoRHInput}
+                setFilterEstadoPagoRHInput={setFilterEstadoPagoRHInput}
                 filterFechaSolicitudInput={filterFechaSolicitudInput}
                 setFilterFechaSolicitudInput={setFilterFechaSolicitudInput}
                 filterMontoInput={filterMontoInput}
@@ -2068,8 +2158,8 @@ export default function DatabasePage() {
             <Button variant="outline" onClick={() => { setIsMinutaDialogOpen(false); setMinutaNumberInput(''); setCurrentSolicitudIdForMinuta(null); }}>Salir</Button>
             <Button onClick={() => {
               if (currentSolicitudIdForMinuta) {
-              handleSaveMinuta(currentSolicitudIdForMinuta, minutaNumberInput);
-            }
+                handleSaveMinuta(currentSolicitudIdForMinuta, minutaNumberInput);
+              }
             }}>Guardar Minuta</Button>
           </DialogFooter>
         </DialogContent>
@@ -2162,3 +2252,5 @@ export default function DatabasePage() {
     </AppShell>
   );
 }
+
+  
