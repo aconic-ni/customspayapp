@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { SolicitudRecord, InitialDataContext } from '@/types';
-import { Loader2, ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2 } from 'lucide-react';
+import { Loader2, ArrowLeft, Printer, CheckSquare, Square, Banknote, Landmark, Hash, User, FileText, Mail, MessageSquare, Building, Code, CalendarDays, Info, Send, Users, Settings2, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -60,8 +60,15 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
         setLoading(true);
         setError(null);
         try {
-          const docRef = doc(db, "SolicitudCheques", id);
-          const docSnap = await getDoc(docRef);
+          // Check both collections
+          const chequeRef = doc(db, "SolicitudCheques", id);
+          const memoRef = doc(db, "Memorandum", id);
+
+          let docSnap = await getDoc(chequeRef);
+          if (!docSnap.exists()) {
+            docSnap = await getDoc(memoRef);
+          }
+
           if (docSnap.exists()) {
             const data = docSnap.data();
             const examDate = data.examDate instanceof FirestoreTimestamp ? data.examDate.toDate() : (data.examDate instanceof Date ? data.examDate : undefined);
@@ -71,59 +78,17 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
             const emailMinutaLastUpdatedAt = data.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? data.emailMinutaLastUpdatedAt.toDate() : (data.emailMinutaLastUpdatedAt instanceof Date ? data.emailMinutaLastUpdatedAt : undefined);
 
             setSolicitud({
-              examNe: data.examNe || '',
-              examReference: data.examReference || null,
-              examManager: data.examManager || '',
-              examDate: examDate,
-              examRecipient: data.examRecipient || '',
+              ...data,
               solicitudId: docSnap.id,
-              monto: data.monto ?? null,
-              montoMoneda: data.montoMoneda || null,
-              cantidadEnLetras: data.cantidadEnLetras || null,
-              consignatario: data.consignatario || null,
-              declaracionNumero: data.declaracionNumero || null,
-              unidadRecaudadora: data.unidadRecaudadora || null,
-              codigo1: data.codigo1 || null,
-              codigo2: data.codigo2 || null,
-              banco: data.banco || null,
-              bancoOtros: data.bancoOtros || null,
-              numeroCuenta: data.numeroCuenta || null,
-              monedaCuenta: data.monedaCuenta || null,
-              monedaCuentaOtros: data.monedaCuentaOtros || null,
-              elaborarChequeA: data.elaborarChequeA || null,
-              elaborarTransferenciaA: data.elaborarTransferenciaA || null,
-              impuestosPagadosCliente: data.impuestosPagadosCliente ?? false,
-              impuestosPagadosRC: data.impuestosPagadosRC || null,
-              impuestosPagadosTB: data.impuestosPagadosTB || null,
-              impuestosPagadosCheque: data.impuestosPagadosCheque || null,
-              impuestosPendientesCliente: data.impuestosPendientesCliente ?? false,
-              soporte: data.soporte ?? false,
-              documentosAdjuntos: data.documentosAdjuntos ?? false,
-              constanciasNoRetencion: data.constanciasNoRetencion ?? false,
-              constanciasNoRetencion1: data.constanciasNoRetencion1 ?? false,
-              constanciasNoRetencion2: data.constanciasNoRetencion2 ?? false,
-              pagoServicios: data.pagoServicios ?? false,
-              tipoServicio: data.tipoServicio || null,
-              otrosTipoServicio: data.otrosTipoServicio || null,
-              facturaServicio: data.facturaServicio || null,
-              institucionServicio: data.institucionServicio || null,
-              correo: data.correo || null,
-              observation: data.observation || null,
+              examDate: examDate,
               savedAt: savedAt,
-              savedBy: data.savedBy || null,
-              paymentStatus: data.paymentStatus || null,
               paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
-              paymentStatusLastUpdatedBy: data.paymentStatusLastUpdatedBy || null,
-              recepcionDCStatus: data.recepcionDCStatus ?? false,
               recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
-              recepcionDCLastUpdatedBy: data.recepcionDCLastUpdatedBy || null,
-              emailMinutaStatus: data.emailMinutaStatus ?? false,
               emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
-              emailMinutaLastUpdatedBy: data.emailMinutaLastUpdatedBy || null,
-              commentsCount: data.commentsCount || 0,
-            });
+            } as SolicitudRecord);
+
           } else {
-            setError("Solicitud no encontrada.");
+            setError("Solicitud no encontrada en ninguna colección.");
           }
         } catch (err) {
           console.error("Error fetching solicitud:", err);
@@ -203,11 +168,18 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
                         <Info className="h-3.5 w-3.5 mr-1.5 text-primary/70" />ID de Solicitud:&nbsp;</p>
                     <p className="text-sm text-foreground break-words">{solicitud.solicitudId}</p>
                 </div>
-                {solicitud.soporte && (
-                  <Badge className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-md border border-gray-300 print:border-gray-400 hover:bg-green-600 hover:text-white">
-                    PAGADA
-                  </Badge>
-                )}
+                <div className='flex items-center gap-2'>
+                  {solicitud.isMemorandum && (
+                    <Badge variant="destructive" className="text-sm font-semibold px-3 py-1">
+                      <StickyNote className="h-4 w-4 mr-1.5" /> Memorándum
+                    </Badge>
+                  )}
+                  {solicitud.soporte && (
+                    <Badge className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-md border border-gray-300 print:border-gray-400 hover:bg-green-600 hover:text-white">
+                      PAGADA
+                    </Badge>
+                  )}
+                </div>
             </div>
           </div>
           <div className="mb-3 p-4 border border-border rounded-md bg-secondary/30 card-print-styles">
@@ -220,6 +192,20 @@ export default function DatabaseSolicitudDetailView({ id, onBackToList, isInline
                 <DetailItem label="Referencia" value={initialDataForDisplay.reference || 'N/A'} icon={FileText} className="md:col-span-2"/>
              </div>
           </div>
+
+          {solicitud.isMemorandum && solicitud.memorandumCollaborators && solicitud.memorandumCollaborators.length > 0 && (
+            <div className="mb-3 p-4 border border-destructive/50 rounded-md bg-destructive/5 card-print-styles">
+              <h3 className="text-lg font-semibold mb-2 text-destructive">Colaboradores del Memorándum</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                {solicitud.memorandumCollaborators.map(collab => (
+                  <div key={collab.id} className="p-2 border-b border-destructive/20">
+                    <DetailItem label="Nombre" value={collab.name} icon={User} />
+                    <DetailItem label="Número Colaborador" value={collab.number} icon={Hash} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           <div className="mb-3 p-4 border border-border rounded-md bg-secondary/30 card-print-styles">
             <p className="text-sm font-medium text-muted-foreground mb-2">
