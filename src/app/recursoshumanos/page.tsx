@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, Briefcase, Trash2, MessageSquareText, User } from 'lucide-react';
+import { Loader2, Search, Download, Eye, Calendar as CalendarIcon, MessageSquare, Info as InfoIcon, AlertCircle, CheckCircle2, FileText as FileTextIcon, ListCollapse, ArrowLeft, Briefcase, Trash2, MessageSquareText, User, ArrowUpDown } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp as FirestoreTimestamp, doc, getDoc, orderBy, updateDoc, serverTimestamp, writeBatch, addDoc, getCountFromServer } from 'firebase/firestore';
 import type { SolicitudRecord, CommentRecord, Collaborator } from '@/types';
 import { downloadExcelFileFromTable } from '@/lib/fileExporter';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   Table,
@@ -44,8 +44,10 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import DatabaseSolicitudDetailView from '@/components/database/DatabaseSolicitudDetailView';
 
-type SearchType = "dateToday" | "dateSpecific";
+type SearchType = "dateToday" | "dateSpecific" | "dateCurrentMonth";
 type RHPaymentStatus = 'caso_no_iniciado' | 'pagado_efectivo' | 'proceso_deduccion' | 'otros';
+type SortableColumns = 'collaborator' | 'date' | 'amount';
+type SortDirection = 'asc' | 'desc';
 
 const formatCurrencyFetched = (amount?: number | string | null, currency?: string) => {
     if (amount === undefined || amount === null || amount === '') return 'N/A';
@@ -70,6 +72,9 @@ interface SearchResultsTableProps {
   filterGuardadoPorInput: string;
   setFilterGuardadoPorInput: (value: string) => void;
   onUpdateRHStatus: (solicitudId: string, status: RHPaymentStatus, details?: { otherDetails?: string; paymentDate?: Date; startDate?: Date; endDate?: Date }) => void;
+  onSort: (column: SortableColumns) => void;
+  sortColumn: SortableColumns | null;
+  sortDirection: SortDirection;
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -83,6 +88,9 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   filterGuardadoPorInput,
   setFilterGuardadoPorInput,
   onUpdateRHStatus,
+  onSort,
+  sortColumn,
+  sortDirection
 }) => {
   const { toast } = useToast();
   
@@ -182,14 +190,32 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                 <TableHead>Acciones</TableHead>
                 <TableHead>Estado de Pago (RH)</TableHead>
                 <TableHead>Fechas de Pago (RH)</TableHead>
-                <TableHead>Colaborador(es)</TableHead>
                 <TableHead>
-                  ID Solicitud
+                    <Button variant="ghost" onClick={() => onSort('collaborator')} className="px-1">
+                        Colaborador(es)
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                </TableHead>
+                <TableHead>
+                    <Button variant="ghost" onClick={() => onSort('date')} className="px-1">
+                        Fecha
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                </TableHead>
+                <TableHead>
+                    <Button variant="ghost" onClick={() => onSort('amount')} className="px-1">
+                        Monto
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                </TableHead>
+                <TableHead>Consignatario</TableHead>
+                <TableHead>
+                  Guardado Por
                    <Input
                     type="text"
-                    placeholder="Filtrar ID..."
-                    value={filterSolicitudIdInput}
-                    onChange={(e) => setFilterSolicitudIdInput(e.target.value)}
+                    placeholder="Filtrar Guardado Por..."
+                    value={filterGuardadoPorInput}
+                    onChange={(e) => setFilterGuardadoPorInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
@@ -203,19 +229,16 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                 <TableHead>Fecha</TableHead>
                 <TableHead>
-                  Guardado Por
+                  ID Solicitud
                    <Input
                     type="text"
-                    placeholder="Filtrar Guardado Por..."
-                    value={filterGuardadoPorInput}
-                    onChange={(e) => setFilterGuardadoPorInput(e.target.value)}
+                    placeholder="Filtrar ID..."
+                    value={filterSolicitudIdInput}
+                    onChange={(e) => setFilterSolicitudIdInput(e.target.value)}
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Consignatario</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="bg-card divide-y divide-border">
@@ -260,12 +283,12 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                   <TableCell>
                     {renderCollaborators(solicitud.memorandumCollaborators)}
                   </TableCell>
-                  <TableCell>{solicitud.solicitudId}</TableCell>
-                  <TableCell>{solicitud.examNe}</TableCell>
                   <TableCell>{solicitud.examDate instanceof Date ? format(solicitud.examDate, "dd/MM/yy", { locale: es }) : 'N/A'}</TableCell>
-                  <TableCell>{solicitud.savedBy || 'N/A'}</TableCell>
                   <TableCell>{formatCurrencyFetched(solicitud.monto ?? undefined, solicitud.montoMoneda || undefined)}</TableCell>
                   <TableCell>{solicitud.consignatario || 'N/A'}</TableCell>
+                  <TableCell>{solicitud.savedBy || 'N/A'}</TableCell>
+                  <TableCell>{solicitud.examNe}</TableCell>
+                  <TableCell>{solicitud.solicitudId}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -361,6 +384,10 @@ export default function RecursosHumanosPage() {
   const [filterSolicitudIdInput, setFilterSolicitudIdInput] = useState('');
   const [filterGuardadoPorInput, setFilterGuardadoPorInput] = useState('');
 
+  const [sortColumn, setSortColumn] = useState<SortableColumns | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [isExporting, setIsExporting] = useState(false);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -393,6 +420,10 @@ export default function RecursosHumanosPage() {
         const todayStart = startOfDay(new Date());
         const todayEnd = endOfDay(new Date());
         q = query(q, where("examDate", ">=", FirestoreTimestamp.fromDate(todayStart)), where("examDate", "<=", FirestoreTimestamp.fromDate(todayEnd)));
+    } else if (searchType === "dateCurrentMonth") {
+        const monthStart = startOfMonth(new Date());
+        const monthEnd = endOfMonth(new Date());
+        q = query(q, where("examDate", ">=", FirestoreTimestamp.fromDate(monthStart)), where("examDate", "<=", FirestoreTimestamp.fromDate(monthEnd)));
     }
 
 
@@ -428,14 +459,55 @@ export default function RecursosHumanosPage() {
     }
   }, [searchType, selectedDate]);
   
+  const handleSort = (column: SortableColumns) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
   const displayedSolicitudes = useMemo(() => {
     if (!fetchedSolicitudes) return null;
-    return fetchedSolicitudes.filter(s => 
+    let filteredData = [...fetchedSolicitudes];
+
+    // Filtering
+    filteredData = filteredData.filter(s => 
       (s.examNe || '').toLowerCase().includes(filterNEInput.toLowerCase()) &&
       s.solicitudId.toLowerCase().includes(filterSolicitudIdInput.toLowerCase()) &&
       (s.savedBy || '').toLowerCase().includes(filterGuardadoPorInput.toLowerCase())
     );
-  }, [fetchedSolicitudes, filterNEInput, filterSolicitudIdInput, filterGuardadoPorInput]);
+
+    // Sorting
+    if (sortColumn) {
+        filteredData.sort((a, b) => {
+            let valA: any = null;
+            let valB: any = null;
+
+            switch(sortColumn) {
+                case 'collaborator':
+                    valA = a.memorandumCollaborators?.[0]?.name?.toLowerCase() || 'zzzzzz';
+                    valB = b.memorandumCollaborators?.[0]?.name?.toLowerCase() || 'zzzzzz';
+                    break;
+                case 'date':
+                    valA = a.examDate?.getTime() ?? 0;
+                    valB = b.examDate?.getTime() ?? 0;
+                    break;
+                case 'amount':
+                    valA = a.monto ?? 0;
+                    valB = b.monto ?? 0;
+                    break;
+            }
+
+            if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+            if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    return filteredData;
+  }, [fetchedSolicitudes, filterNEInput, filterSolicitudIdInput, filterGuardadoPorInput, sortColumn, sortDirection]);
 
   const handleViewDetailsInline = (solicitud: SolicitudRecord) => {
     setSolicitudToViewInline(solicitud);
@@ -519,6 +591,79 @@ export default function RecursosHumanosPage() {
 
   }, [user, toast]);
 
+  const handleExport = async () => {
+    const dataToUse = displayedSolicitudes || [];
+    if (dataToUse.length === 0) {
+      toast({ title: "Sin Datos", description: "No hay datos para exportar.", variant: "default" });
+      return;
+    }
+    setIsExporting(true);
+    toast({ title: "Exportando...", description: "Preparando datos para Excel...", duration: 5000 });
+
+    const headers = [
+      "Estado Pago (RH)", "Detalle Otro (RH)", "Fecha Pago (RH)", "Fecha Inicio Pago (RH)", "Fecha Fin Pago (RH)",
+      "Colaboradores", "Fecha", "Monto", "Moneda Monto", "Consignatario", "Guardado Por",
+      "NE", "ID Solicitud", "Comentarios"
+    ];
+
+    const dataToExportPromises = dataToUse.map(async (s) => {
+      let commentsString = 'N/A';
+      if (s.commentsCount && s.commentsCount > 0) {
+        try {
+            const commentsColRef = collection(db, "Memorandum", s.solicitudId, "comments");
+            const q = query(commentsColRef, orderBy("createdAt", "asc"));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                commentsString = querySnapshot.docs.map(docSnap => {
+                    const data = docSnap.data();
+                    const createdAt = data.createdAt instanceof FirestoreTimestamp ? data.createdAt.toDate() : new Date();
+                    return `${data.userEmail} - ${format(createdAt, "dd/MM/yy HH:mm")}: ${data.text}`;
+                }).join("\n");
+            }
+        } catch (err) {
+            commentsString = 'Error al cargar comentarios';
+        }
+      }
+
+      const rhStatusMap: { [key: string]: string } = {
+        'caso_no_iniciado': 'Caso no iniciado',
+        'pagado_efectivo': 'Pagado Efectivo',
+        'proceso_deduccion': 'En proceso de deducción',
+        'otros': 'Otros',
+      };
+      
+      const collaboratorsString = s.memorandumCollaborators?.map(c => `${c.name} (${c.number})`).join('; ') || 'N/A';
+
+      return {
+        "Estado Pago (RH)": rhStatusMap[s.rhPaymentStatus || ''] || 'N/A',
+        "Detalle Otro (RH)": s.rhPaymentStatus === 'otros' ? s.rhPaymentOtherDetails : 'N/A',
+        "Fecha Pago (RH)": s.rhPaymentDate ? format(s.rhPaymentDate, "yyyy-MM-dd") : 'N/A',
+        "Fecha Inicio Pago (RH)": s.rhPaymentStartDate ? format(s.rhPaymentStartDate, "yyyy-MM-dd") : 'N/A',
+        "Fecha Fin Pago (RH)": s.rhPaymentEndDate ? format(s.rhPaymentEndDate, "yyyy-MM-dd") : 'N/A',
+        "Colaboradores": collaboratorsString,
+        "Fecha": s.examDate ? format(s.examDate, "yyyy-MM-dd") : 'N/A',
+        "Monto": s.monto,
+        "Moneda Monto": s.montoMoneda,
+        "Consignatario": s.consignatario || 'N/A',
+        "Guardado Por": s.savedBy || 'N/A',
+        "NE": s.examNe,
+        "ID Solicitud": s.solicitudId,
+        "Comentarios": commentsString,
+      };
+    });
+
+    try {
+        const dataToExport = await Promise.all(dataToExportPromises);
+        downloadExcelFileFromTable(dataToExport, headers, `Reporte_Memorandums_${new Date().toISOString().split('T')[0]}.xlsx`);
+        toast({ title: "Exportación Completa", description: "El archivo Excel se ha descargado." });
+    } catch (err) {
+        toast({ title: "Error de Exportación", description: "No se pudo preparar los datos para exportar.", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+
   if (!isClient || authLoading) {
     return <div className="min-h-screen flex items-center justify-center grid-bg"><Loader2 className="h-12 w-12 animate-spin text-white" /></div>;
   }
@@ -548,10 +693,11 @@ export default function RecursosHumanosPage() {
             <form onSubmit={handleSearch} className="space-y-4 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                  <Select value={searchType} onValueChange={(v) => setSearchType(v as SearchType)}>
-                  <SelectTrigger className="w-full sm:w-[200px] shrink-0"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[240px] shrink-0"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
                     <SelectItem value="dateSpecific">Por Fecha (Específica)</SelectItem>
+                    <SelectItem value="dateCurrentMonth">Por Mes (Actual)</SelectItem>
                   </SelectContent>
                 </Select>
                 {searchType === 'dateSpecific' && (
@@ -560,8 +706,12 @@ export default function RecursosHumanosPage() {
                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(d) => {setSelectedDate(d); setIsSpecificDatePopoverOpen(false);}} initialFocus locale={es} /></PopoverContent>
                   </Popover>
                 )}
+                 <Button type="submit" className="btn-primary" disabled={isLoading}><Search className="mr-2 h-4 w-4" /> {isLoading ? 'Buscando...' : 'Buscar Memorandums'}</Button>
+                 <Button type="button" onClick={handleExport} variant="outline" className="w-full sm:w-auto" disabled={!displayedSolicitudes || isLoading || isExporting}>
+                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isExporting ? 'Exportando...' : 'Exportar a Excel'}
+                 </Button>
               </div>
-              <Button type="submit" className="btn-primary" disabled={isLoading}><Search className="mr-2 h-4 w-4" /> {isLoading ? 'Buscando...' : 'Buscar Memorandums'}</Button>
             </form>
 
             {isLoading && <div className="flex justify-center items-center py-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}
@@ -578,6 +728,9 @@ export default function RecursosHumanosPage() {
                 filterGuardadoPorInput={filterGuardadoPorInput}
                 setFilterGuardadoPorInput={setFilterGuardadoPorInput}
                 onUpdateRHStatus={handleUpdateRHStatus}
+                onSort={handleSort}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
               />
             )}
           </CardContent>
