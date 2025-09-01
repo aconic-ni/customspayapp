@@ -1,7 +1,7 @@
 
 "use client";
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,14 +12,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAppContext, SolicitudStep } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext';
 import type { SolicitudFormData } from './FormParts/zodSchemas';
 import { solicitudSchema } from './FormParts/zodSchemas';
 import type { SolicitudData } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { X, Hash, FileText, Tag, Landmark, Mail, FilePlus, DollarSign, ListFilter, Building, Code, MessageSquare, Banknote, User, Info, Settings2, Users, CalendarDays, Package, Search } from 'lucide-react';
+import { X, Hash, FileText, Tag, Landmark, Mail, FilePlus, DollarSign, ListFilter, Building, Code, MessageSquare, Banknote, User, Info, Settings2, Users, CalendarDays, Package, Search, Trash2, UserPlus } from 'lucide-react';
 import { numeroALetras } from '@/lib/numeroALetras';
 import { Label } from '@/components/ui/label';
+import { v4 as uuidv4 } from 'uuid';
+import { Badge } from '@/components/ui/badge';
+
 
 // Define the structure for the account registry
 interface AccountRegistryEntry {
@@ -70,7 +73,8 @@ export function AddProductModal() {
     addSolicitud,
     updateSolicitud,
     editingSolicitud,
-    initialContextData
+    initialContextData,
+    isMemorandumMode
   } = useAppContext();
   const { user } = useAuth();
   const [showBancoOtros, setShowBancoOtros] = useState(false);
@@ -82,7 +86,7 @@ export function AddProductModal() {
   const form = useForm<SolicitudFormData>({
     resolver: zodResolver(solicitudSchema),
     defaultValues: { 
-      monto: 0, // Zod schema expects number after preprocess
+      monto: 0,
       montoMoneda: 'cordoba',
       cantidadEnLetras: '',
       consignatario: '',
@@ -114,14 +118,20 @@ export function AddProductModal() {
       institucionServicio: '',
       correo: user?.email || '',
       observation: '',
+      memorandumCollaborators: [],
     }
+  });
+
+  const { fields: collaboratorFields, append: appendCollaborator, remove: removeCollaborator } = useFieldArray({
+    control: form.control,
+    name: "memorandumCollaborators",
   });
 
   const watchedBanco = form.watch("banco");
   const watchedMonedaCuenta = form.watch("monedaCuenta");
   const watchedImpuestosPagados = form.watch("impuestosPagadosCliente");
   const watchedConstanciasNoRetencion = form.watch("constanciasNoRetencion");
-  const watchedMonto = form.watch("monto"); // This will be a number from RHF state
+  const watchedMonto = form.watch("monto");
   const watchedMontoMoneda = form.watch("montoMoneda");
   const watchedPagoServicios = form.watch("pagoServicios");
   const watchedTipoServicio = form.watch("tipoServicio");
@@ -129,7 +139,9 @@ export function AddProductModal() {
   const sanitizeMontoInput = (inputValue: string | number | undefined): string => {
     if (inputValue === undefined || inputValue === null) return '';
     let value = String(inputValue); 
-    value = value.replace(/[^\d.]/g, "");
+
+    // Allow only digits and a single dot
+    value = value.replace(/[^0-9.]/g, '');
 
     const dotIndex = value.indexOf('.');
     if (dotIndex !== -1) {
@@ -216,15 +228,13 @@ export function AddProductModal() {
         institucionServicio: '',
         correo: defaultCorreo,
         observation: '',
+        memorandumCollaborators: [],
       };
 
       setSelectedAccountName(null); 
 
       if (editingSolicitud) {
-        // editingSolicitud.monto is number | undefined from SolicitudData
-        // For the form, RHF expects a number for 'monto' based on Zod schema
         const montoForForm = editingSolicitud.monto ?? 0;
-
 
         const populatedEditingSolicitud: SolicitudFormData = {
           ...initialValues, 
@@ -237,6 +247,7 @@ export function AddProductModal() {
           otrosTipoServicio: editingSolicitud.otrosTipoServicio || '',
           facturaServicio: editingSolicitud.facturaServicio || '',
           institucionServicio: editingSolicitud.institucionServicio || '',
+          memorandumCollaborators: editingSolicitud.memorandumCollaborators || [],
         };
         form.reset(populatedEditingSolicitud);
         setShowBancoOtros(editingSolicitud.banco === 'Otros');
@@ -253,7 +264,6 @@ export function AddProductModal() {
         if (matchingAccount) {
             setSelectedAccountName(matchingAccount.name);
         }
-
 
       } else {
         form.reset(initialValues);
@@ -275,19 +285,18 @@ export function AddProductModal() {
     }
   };
 
-function onSubmit(data: SolicitudFormData) {
-    // data.monto is already a number here due to Zod schema processing
-    // and RHF managing the form state as number for 'monto'.
-    const solicitudDataToSave: Omit<SolicitudData, 'id'> & { id?: string } = {
-        ...data, // data already conforms to SolicitudFormData
-        monto: data.monto, // data.monto is number here
+  function onSubmit(data: SolicitudFormData) {
+    const solicitudDataToSave: Omit<SolicitudData, 'id'> & { id?: string, isMemorandum?: boolean } = {
+        ...data,
+        monto: data.monto,
         soporte: data.soporte ?? false,
         pagoServicios: data.pagoServicios ?? false,
-        // Ensure enum types are correctly cast if necessary, though Zod should handle this.
         montoMoneda: data.montoMoneda as SolicitudData['montoMoneda'],
         banco: data.banco as SolicitudData['banco'],
         monedaCuenta: data.monedaCuenta as SolicitudData['monedaCuenta'],
-        tipoServicio: data.tipoServicio as SolicitudData['tipoServicio'], 
+        tipoServicio: data.tipoServicio as SolicitudData['tipoServicio'],
+        isMemorandum: isMemorandumMode,
+        memorandumCollaborators: data.memorandumCollaborators || []
     };
 
     if (editingSolicitud && editingSolicitud.id) {
@@ -317,6 +326,7 @@ function onSubmit(data: SolicitudFormData) {
             <DialogHeader className="mb-6">
               <DialogTitle className="text-xl font-semibold text-foreground">
                 {editingSolicitud ? 'Editar Solicitud' : 'Nueva solicitud'}
+                {isMemorandumMode && <Badge variant="destructive" className="ml-3 align-middle">Memorandum</Badge>}
               </DialogTitle>
               <button
                 onClick={closeAddProductModal}
@@ -376,6 +386,55 @@ function onSubmit(data: SolicitudFormData) {
                   </div>
                 )}
 
+                {isMemorandumMode && (
+                  <div className="space-y-4 p-4 border border-destructive/50 rounded-md bg-destructive/5">
+                      <h4 className="text-md font-medium text-destructive mb-2">Colaboradores del Memorandum</h4>
+                      {collaboratorFields.map((field, index) => (
+                          <div key={field.id} className="flex items-end gap-3 p-3 border rounded-md">
+                              <FormField
+                                  control={form.control}
+                                  name={`memorandumCollaborators.${index}.name`}
+                                  render={({ field }) => (
+                                      <FormItem className="flex-grow">
+                                          <FormLabel className="text-xs">Nombre del Colaborador</FormLabel>
+                                          <FormControl><Input {...field} placeholder="Nombre completo" /></FormControl>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name={`memorandumCollaborators.${index}.number`}
+                                  render={({ field }) => (
+                                      <FormItem className="flex-grow">
+                                          <FormLabel className="text-xs">Número de Colaborador</FormLabel>
+                                          <FormControl><Input {...field} placeholder="ID o número" /></FormControl>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
+                              <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() => removeCollaborator(index)}
+                                  className="h-9 w-9 shrink-0"
+                              >
+                                  <Trash2 className="h-4 w-4" />
+                              </Button>
+                          </div>
+                      ))}
+                      <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => appendCollaborator({ id: uuidv4(), name: '', number: '' })}
+                          className="mt-2"
+                      >
+                          <UserPlus className="mr-2 h-4 w-4" /> Añadir Colaborador
+                      </Button>
+                  </div>
+                )}
+
                 <div className="space-y-4 p-4 border rounded-md">
                   <h4 className="text-md font-medium text-primary mb-2">Detalles del Monto</h4>
                   <FormField control={form.control} name="monto" render={({ field }) => ( 
@@ -390,11 +449,10 @@ function onSubmit(data: SolicitudFormData) {
                             type="text" 
                             inputMode="decimal"
                             placeholder="0.00"
-                            {...field}
-                            value={field.value === 0 && !form.getFieldState("monto").isDirty ? '' : String(field.value ?? '')} 
+                            value={field.value ?? ''}
                             onChange={(e) => {
-                              const sanitized = sanitizeMontoInput(e.target.value);
-                              field.onChange(sanitized); // Pass string to Zod preprocess
+                                const sanitized = sanitizeMontoInput(e.target.value);
+                                field.onChange(sanitized);
                             }}
                             className="w-2/3"
                           />
