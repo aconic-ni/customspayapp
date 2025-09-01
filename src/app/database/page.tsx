@@ -1015,6 +1015,25 @@ export default function DatabasePage() {
         accumulatedData = accumulatedData.filter(s => duplicateFilterIds.includes(s.solicitudId));
     }
 
+    const hasActiveFilters = 
+      filterEstadoSolicitudInput.trim() ||
+      filterEstadoPagoInput.trim() ||
+      filterEstadoPagoRHInput.trim() ||
+      filterRecpDocsInput.trim() ||
+      filterNotMinutaInput.trim() ||
+      filterSolicitudIdInput.trim() ||
+      filterFechaSolicitudInput.trim() ||
+      filterNEInput.trim() ||
+      filterMontoInput.trim() ||
+      filterConsignatarioInput.trim() ||
+      filterDeclaracionInput.trim() ||
+      filterReferenciaInput.trim() ||
+      (filterGuardadoPorInput.trim() && user?.role !== 'autorevisor' && user?.role !== 'autorevisor_plus') ||
+        (duplicateFilterIds && duplicateFilterIds.length > 0);
+
+if (accumulatedData.length === 0 && hasActiveFilters) {
+  return fetchedSolicitudes;
+}
 
     return accumulatedData;
   }, [
