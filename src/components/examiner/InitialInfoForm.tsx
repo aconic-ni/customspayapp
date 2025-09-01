@@ -1,4 +1,3 @@
-
 "use client";
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
@@ -12,7 +11,7 @@ import type { InitialDataFormData } from './FormParts/zodSchemas';
 import { initialDataSchema } from './FormParts/zodSchemas';
 import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, StickyNote } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -34,7 +33,7 @@ function extractNameFromEmail(email?: string | null): string {
 }
 
 export function InitialDataForm() {
-  const { setInitialContextData, setCurrentStep, initialContextData: existingInitialContextData } = useAppContext();
+  const { setInitialContextData, setCurrentStep, initialContextData: existingInitialContextData, setIsMemorandumMode } = useAppContext();
   const { user } = useAuth();
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
 
@@ -53,12 +52,27 @@ export function InitialDataForm() {
     },
   });
 
+  const handleRecipientClick = (recipient: string) => {
+    form.setValue('recipient', recipient, { shouldValidate: true });
+    if (recipient.toLowerCase() === 'memorandum') {
+        setIsMemorandumMode(true);
+    } else {
+        setIsMemorandumMode(false);
+    }
+  };
+
+
 function onSubmit(data: InitialDataFormData) {
   setInitialContextData({
     ...existingInitialContextData,
     ...data,
     reference: data.reference || "",
   });
+  if (data.recipient.toLowerCase() === 'memorandum') {
+    setIsMemorandumMode(true);
+  } else {
+    setIsMemorandumMode(false);
+  }
   setCurrentStep(SolicitudStep.PRODUCT_LIST);
 }
 
@@ -85,7 +99,7 @@ function onSubmit(data: InitialDataFormData) {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => form.setValue('recipient', 'Contabilidad', { shouldValidate: true })}
+                        onClick={() => handleRecipientClick('Contabilidad')}
                         className="text-xs"
                       >
                         Contabilidad
@@ -94,7 +108,7 @@ function onSubmit(data: InitialDataFormData) {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => form.setValue('recipient', 'Harol Ampie - Contabilidad', { shouldValidate: true })}
+                        onClick={() => handleRecipientClick('Harol Ampie - Contabilidad')}
                         className="text-xs"
                       >
                         Harol Ampie - Contabilidad
@@ -103,10 +117,20 @@ function onSubmit(data: InitialDataFormData) {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => form.setValue('recipient', 'Jose Daniel Cerros - Contabilidad', { shouldValidate: true })}
+                        onClick={() => handleRecipientClick('Jose Daniel Cerros - Contabilidad')}
                         className="text-xs"
                       >
                         Jose Daniel Cerros - Contabilidad
+                      </Button>
+                       <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleRecipientClick('Memorandum')}
+                        className="text-xs"
+                      >
+                        <StickyNote className="mr-2 h-4 w-4" />
+                        Memorandum
                       </Button>
                     </div>
                     <FormMessage />
@@ -176,7 +200,7 @@ function onSubmit(data: InitialDataFormData) {
                 name="ne"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>NE (Seguimiento NX1) * / No usar &apos;/&apos;, ni &apos;-&apos;.</FormLabel>
+                    <FormLabel>NE (Seguimiento NX1) * / No usar &quot;/&quot;, ni &quot;-&quot;.</FormLabel>
                     <FormControl>
                       <Input placeholder="Ej: NX112345" {...field} value={field.value ?? ''} />
                     </FormControl>
