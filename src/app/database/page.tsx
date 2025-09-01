@@ -623,7 +623,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                          'En Trámite RH'}
                       </Badge>
                     ) : (
-                      <Badge variant="ghost" className="text-muted-foreground">N/A</Badge>
+                      <Badge variant="secondary" className="text-muted-foreground">N/A</Badge>
                     )}
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
