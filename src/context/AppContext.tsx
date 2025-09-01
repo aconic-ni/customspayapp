@@ -35,6 +35,10 @@ interface AppContextType {
   setSolicitudToViewInline: (solicitud: SolicitudData | null) => void;
   isDetailViewInlineVisible: boolean;
   setIsDetailViewInlineVisible: (isVisible: boolean) => void;
+
+  // New state for memorandum mode
+  isMemorandumMode: boolean;
+  setIsMemorandumMode: (isMemoMode: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -49,6 +53,7 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
   // New state for inline detail view
   const [solicitudToViewInline, setSolicitudToViewInlineState] = useState<SolicitudData | null>(null);
   const [isDetailViewInlineVisible, setIsDetailViewInlineVisibleState] = useState<boolean>(false);
+  const [isMemorandumMode, setIsMemorandumModeState] = useState<boolean>(false);
 
   const { toast } = useToast(); // Initialize useToast
   const { user: authUser } = useAuth();
@@ -62,6 +67,7 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
     setIsAddProductModalOpen(false);
     setSolicitudToViewInlineState(null); // Reset inline view state
     setIsDetailViewInlineVisibleState(false); // Reset inline view visibility
+    setIsMemorandumModeState(false); // Reset memorandum mode
   }, []);
 
 
@@ -79,6 +85,10 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
 
   const setInitialContextData = useCallback((data: InitialDataContext) => {
     setInitialContextDataState(prevData => ({ ...prevData, ...data }));
+  }, []);
+  
+  const setIsMemorandumMode = useCallback((isMemoMode: boolean) => {
+    setIsMemorandumModeState(isMemoMode);
   }, []);
 
   const addSolicitud = useCallback((solicitudData: Omit<SolicitudData, 'id'>) => {
@@ -188,6 +198,8 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({ children })
         setSolicitudToViewInline,
         isDetailViewInlineVisible,
         setIsDetailViewInlineVisible,
+        isMemorandumMode,
+        setIsMemorandumMode
       }}
     >
       {children}
