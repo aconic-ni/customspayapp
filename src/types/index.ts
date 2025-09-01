@@ -10,6 +10,12 @@ export interface InitialDataContext {
   recipient: string; // "A:"
 }
 
+export interface Collaborator {
+  id: string; // uuid
+  name: string;
+  number: string;
+}
+
 // Stricter types for form data and app context
 export interface SolicitudData {
   id: string;
@@ -54,6 +60,10 @@ export interface SolicitudData {
 
   correo?: string;
   observation?: string;
+
+  // New field for Memorandum
+  memorandumCollaborators?: Collaborator[];
+  isMemorandum?: boolean;
 }
 
 
@@ -61,11 +71,11 @@ export interface AppUser {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  role?: 'revisor' | 'calificador' | 'autorevisor' | 'admin' | 'autorevisor_plus' | string;
-  canReviewUserEmails?: string[]; // Changed from canReviewUserEmail: string to string[]
+  role?: 'revisor' | 'calificador' | 'autorevisor' | 'admin' | 'autorevisor_plus' | 'recursosHumanos' | string;
+  canReviewUserEmails?: string[]; 
 }
 
-// Represents the structure of each document in the "SolicitudCheques" collection
+// Represents the structure of each document in the "SolicitudCheques" or "Memorandum" collection
 // Uses JS Date objects for client-side consistency. Conversion to Firestore Timestamp happens at write time.
 export interface SolicitudRecord {
   examNe: string;
@@ -117,6 +127,8 @@ export interface SolicitudRecord {
   correo: string | null;
   observation: string | null;
 
+  memorandumCollaborators?: Collaborator[];
+
   savedAt: Date | undefined; 
   savedBy: string | null;
 
@@ -134,7 +146,18 @@ export interface SolicitudRecord {
   emailMinutaLastUpdatedBy: string | null;
 
   commentsCount?: number;
-  hasOpenUrgentComment?: boolean; // New field for urgent comment flag
+  hasOpenUrgentComment?: boolean;
+
+  isMemorandum?: boolean; 
+  
+  // New fields for Recursos Humanos module
+  rhPaymentStatus?: 'caso_no_iniciado' | 'pagado_efectivo' | 'proceso_deduccion' | 'otros' | null;
+  rhPaymentOtherDetails?: string | null;
+  rhPaymentDate?: Date;
+  rhPaymentStartDate?: Date;
+  rhPaymentEndDate?: Date;
+  rhStatusLastUpdatedAt?: Date;
+  rhStatusLastUpdatedBy?: string | null;
 }
 
 // New type for comments
