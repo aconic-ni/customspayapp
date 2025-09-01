@@ -127,7 +127,8 @@ interface SearchResultsTableProps {
   duplicateSets: Map<string, string[]>;
   onResolveDuplicate: (key: string, resolution: "validated_not_duplicate" | "deletion_requested") => void;
   resolvedDuplicateKeys: string[]; 
-  permanentlyResolvedDuplicateKeys: string[]; 
+  permanentlyResolvedDuplicateKeys: string[];
+  onOpenViewErrorDialog: (errorMessage: string) => void;
 }
 
 const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
@@ -177,6 +178,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
   onResolveDuplicate,
   resolvedDuplicateKeys,
   permanentlyResolvedDuplicateKeys,
+  onOpenViewErrorDialog,
 }) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -286,6 +288,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
+                {/*
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Estado Pago (RH)
                   <Input
@@ -296,6 +299,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                     className="mt-1 h-8 text-xs"
                   />
                 </TableHead>
+                */}
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   RECP. DOCS
                   <Input
@@ -543,9 +547,11 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                             )}
                           </div>
                         )}
-                        {solicitud.paymentStatus && solicitud.paymentStatus.startsWith('Error:') && (
-                            <Badge variant="destructive">{solicitud.paymentStatus}</Badge>
-                        )}
+                        {solicitud.paymentStatus && solicitud.paymentStatus.startsWith('Error:') ? (
+                           <button type="button" className="p-0 h-auto bg-transparent border-none" onClick={() => onOpenViewErrorDialog(solicitud.paymentStatus!.substring("Error: ".length))}>
+                            <Badge variant="destructive" className="cursor-pointer">Error</Badge>
+                           </button>
+                        ) : null}
                         {(!solicitud.paymentStatus || (solicitud.paymentStatus && !solicitud.paymentStatus.startsWith('Error:') && solicitud.paymentStatus !== 'Pagado')) && (
                              <Badge variant="outline">Pendiente</Badge>
                         )}
@@ -573,9 +579,11 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1"/> Pagado
                           </Badge>
                         ) : solicitud.paymentStatus && solicitud.paymentStatus.startsWith('Error:') ? (
-                          <Badge variant="destructive" className="flex items-center">
-                            <AlertCircle className="h-3.5 w-3.5 mr-1"/> {solicitud.paymentStatus}
-                          </Badge>
+                           <button type="button" className="p-0 h-auto bg-transparent border-none" onClick={() => onOpenViewErrorDialog(solicitud.paymentStatus!.substring("Error: ".length))}>
+                              <Badge variant="destructive" className="cursor-pointer flex items-center">
+                                  <AlertCircle className="h-3.5 w-3.5 mr-1"/> Error
+                              </Badge>
+                           </button>
                         ) : (
                           <Badge variant="outline">Pendiente</Badge>
                         )}
@@ -612,6 +620,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                       </div>
                     )}
                   </TableCell>
+                  {/*
                    <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                     {solicitud.isMemorandum ? (
                       <Badge className="bg-rose-100 text-rose-700 flex items-center gap-2">
@@ -626,6 +635,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
                       <Badge variant="secondary" className="text-muted-foreground">N/A</Badge>
                     )}
                   </TableCell>
+                  */}
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm">
                      {currentUserRole === 'calificador' ? (
                         <div className="flex items-center space-x-2">
@@ -849,6 +859,10 @@ export default function DatabasePage() {
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
   const [currentSolicitudIdForMessage, setCurrentSolicitudIdForMessage] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
+  
+  const [isViewErrorDialogOpen, setIsViewErrorDialogOpen] = useState(false);
+  const [errorMessageToView, setErrorMessageToView] = useState('');
+
 
   const [isMinutaDialogOpen, setIsMinutaDialogOpen] = useState(false);
   const [currentSolicitudIdForMinuta, setCurrentSolicitudIdForMinuta] = useState<string | null>(null);
@@ -932,90 +946,103 @@ export default function DatabasePage() {
     setSolicitudToViewInline(null);
   };
 
-
-  const displayedSolicitudes = useMemo(() => {
+  const filteredSolicitudes = useMemo(() => {
     if (!fetchedSolicitudes) return null;
-    let accumulatedData = [...fetchedSolicitudes];
-
+  
     const applyFilter = (
-        data: SolicitudRecord[],
-        filterValue: string,
-        filterFn: (item: SolicitudRecord, searchTerm: string) => boolean
+      data: SolicitudRecord[],
+      filterValue: string,
+      filterFn: (item: SolicitudRecord, searchTerm: string) => boolean
     ): SolicitudRecord[] => {
-        if (!filterValue.trim()) return data;
-        const searchTerm = filterValue.toLowerCase().trim();
-        return data.filter(item => filterFn(item, searchTerm));
+      if (!filterValue.trim()) return data;
+      const searchTerm = filterValue.toLowerCase().trim();
+      return data.filter(item => filterFn(item, searchTerm));
     };
-
+  
+    let accumulatedData = [...fetchedSolicitudes];
+  
     accumulatedData = applyFilter(accumulatedData, filterEstadoSolicitudInput, (s, term) => {
-        const badgeTexts: string[] = [];
-        if (s.isMemorandum) badgeTexts.push("Memorandum");
-        if (s.documentosAdjuntos) badgeTexts.push("Docs Adjuntos");
-        if (s.soporte) badgeTexts.push("Soporte");
-        if (s.impuestosPendientesCliente) badgeTexts.push("Imp. Pendientes");
-        if (s.constanciasNoRetencion) badgeTexts.push("Const. No Ret.");
-        if (s.pagoServicios) badgeTexts.push("Pago Serv.");
-        if (badgeTexts.length === 0) badgeTexts.push("Sin Estados");
-        return badgeTexts.some(badgeText => badgeText.toLowerCase().includes(term));
+      const badgeTexts: string[] = [];
+      if (s.isMemorandum) badgeTexts.push("Memorandum");
+      if (s.documentosAdjuntos) badgeTexts.push("Docs Adjuntos");
+      if (s.soporte) badgeTexts.push("Soporte");
+      if (s.impuestosPendientesCliente) badgeTexts.push("Imp. Pendientes");
+      if (s.constanciasNoRetencion) badgeTexts.push("Const. No Ret.");
+      if (s.pagoServicios) badgeTexts.push("Pago Serv.");
+      if (badgeTexts.length === 0) badgeTexts.push("Sin Estados");
+      return badgeTexts.some(badgeText => badgeText.toLowerCase().includes(term));
     });
-
-    accumulatedData = applyFilter(accumulatedData, filterEstadoPagoInput, (s, term) =>
-        (s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente").includes(term)
-    );
+  
+    accumulatedData = applyFilter(accumulatedData, filterEstadoPagoInput, (s, term) => {
+      let statusText = (s.paymentStatus ? s.paymentStatus.toLowerCase() : "pendiente");
+      if (statusText.startsWith('error:')) {
+        statusText = 'error';
+      }
+      return statusText.includes(term);
+    });
+  
     accumulatedData = applyFilter(accumulatedData, filterEstadoPagoRHInput, (s, term) => {
-        if (!s.isMemorandum) return false;
-        const statusMap: { [key: string]: string } = {
-          'caso_no_iniciado': 'caso no iniciado',
-          'pagado_efectivo': 'pagado efectivo',
-          'proceso_deduccion': 'en deduccion',
-          'otros': 'otros',
-        };
-        const rhStatusText = s.rhPaymentStatus ? (statusMap[s.rhPaymentStatus] || s.rhPaymentStatus) : 'en trámite rh';
-        return rhStatusText.includes(term);
+      if (!s.isMemorandum) return term === "n/a" || term === "na";
+      const statusMap: { [key: string]: string } = {
+        'caso_no_iniciado': 'caso no iniciado',
+        'pagado_efectivo': 'pagado efectivo',
+        'proceso_deduccion': 'en deduccion',
+        'otros': `otros: ${s.rhPaymentOtherDetails || ''}`.toLowerCase(),
+      };
+      const rhStatusText = s.rhPaymentStatus ? (statusMap[s.rhPaymentStatus] || s.rhPaymentStatus) : 'en trámite rh';
+      return rhStatusText.includes(term);
     });
+  
     accumulatedData = applyFilter(accumulatedData, filterRecpDocsInput, (s, term) => {
-        const statusText = s.recepcionDCStatus ? "recibido" : "pendiente";
-        return statusText.includes(term);
+      const statusText = s.recepcionDCStatus ? "recibido" : "pendiente";
+      return statusText.includes(term);
     });
+  
     accumulatedData = applyFilter(accumulatedData, filterNotMinutaInput, (s, term) => {
-        const statusText = s.emailMinutaStatus ? "notificado" : "pendiente";
-        return statusText.includes(term);
+      const statusText = s.emailMinutaStatus ? "notificado" : "pendiente";
+      return statusText.includes(term);
     });
+  
     accumulatedData = applyFilter(accumulatedData, filterSolicitudIdInput, (s, term) =>
-        s.solicitudId.toLowerCase().includes(term)
+      s.solicitudId.toLowerCase().includes(term)
     );
+  
     accumulatedData = applyFilter(accumulatedData, filterFechaSolicitudInput, (s, term) => {
-        const dateText = s.examDate && s.examDate instanceof Date ? format(s.examDate, "dd/MM/yy", { locale: es }) : 'N/A';
-        return dateText.toLowerCase().includes(term);
+      const dateText = s.examDate && s.examDate instanceof Date ? format(s.examDate, "dd/MM/yy", { locale: es }) : 'N/A';
+      return dateText.toLowerCase().includes(term);
     });
+  
     accumulatedData = applyFilter(accumulatedData, filterNEInput, (s, term) =>
-        (s.examNe || '').toLowerCase().includes(term)
+      (s.examNe || '').toLowerCase().includes(term)
     );
+  
     accumulatedData = applyFilter(accumulatedData, filterMontoInput, (s, term) => {
-        const montoText = formatCurrencyFetched(s.monto ?? undefined, s.montoMoneda || undefined);
-        return montoText.toLowerCase().includes(term);
+      const montoText = formatCurrencyFetched(s.monto ?? undefined, s.montoMoneda || undefined);
+      return montoText.toLowerCase().includes(term);
     });
+  
     accumulatedData = applyFilter(accumulatedData, filterConsignatarioInput, (s, term) =>
-        (s.consignatario || '').toLowerCase().includes(term)
+      (s.consignatario || '').toLowerCase().includes(term)
     );
+  
     accumulatedData = applyFilter(accumulatedData, filterDeclaracionInput, (s, term) =>
-        (s.declaracionNumero || '').toLowerCase().includes(term)
+      (s.declaracionNumero || '').toLowerCase().includes(term)
     );
+  
     accumulatedData = applyFilter(accumulatedData, filterReferenciaInput, (s, term) =>
-        (s.examReference || '').toLowerCase().includes(term)
+      (s.examReference || '').toLowerCase().includes(term)
     );
-
+  
     if (user?.role !== 'autorevisor' && user?.role !== 'autorevisor_plus') {
       accumulatedData = applyFilter(accumulatedData, filterGuardadoPorInput, (s, term) =>
         (s.savedBy || '').toLowerCase().includes(term)
       );
     }
-
+  
     if (duplicateFilterIds && duplicateFilterIds.length > 0) {
-        accumulatedData = accumulatedData.filter(s => duplicateFilterIds.includes(s.solicitudId));
+      accumulatedData = accumulatedData.filter(s => duplicateFilterIds.includes(s.solicitudId));
     }
-
-
+  
     return accumulatedData;
   }, [
     fetchedSolicitudes,
@@ -1033,8 +1060,37 @@ export default function DatabasePage() {
     filterReferenciaInput,
     filterGuardadoPorInput,
     user?.role,
-    duplicateFilterIds, 
+    duplicateFilterIds,
   ]);
+  
+  const hasActiveFilters = useMemo(() => {
+    return [
+      filterEstadoSolicitudInput, filterEstadoPagoInput, filterEstadoPagoRHInput,
+      filterRecpDocsInput, filterNotMinutaInput, filterSolicitudIdInput,
+      filterFechaSolicitudInput, filterNEInput, filterMontoInput,
+      filterConsignatarioInput, filterDeclaracionInput, filterReferenciaInput,
+      filterGuardadoPorInput
+    ].some(filter => filter.trim() !== '');
+  }, [
+    filterEstadoSolicitudInput, filterEstadoPagoInput, filterEstadoPagoRHInput,
+    filterRecpDocsInput, filterNotMinutaInput, filterSolicitudIdInput,
+    filterFechaSolicitudInput, filterNEInput, filterMontoInput,
+    filterConsignatarioInput, filterDeclaracionInput, filterReferenciaInput,
+    filterGuardadoPorInput
+  ]);
+
+  const displayedSolicitudes = useMemo(() => {
+    if (!fetchedSolicitudes) return [];
+    
+    // If filters are active and the filtered result is empty, return the original full list.
+    if (hasActiveFilters && filteredSolicitudes && filteredSolicitudes.length === 0) {
+      return fetchedSolicitudes;
+    }
+    
+    // Otherwise, return the filtered list (or the full list if no filters are active).
+    return filteredSolicitudes || fetchedSolicitudes;
+  }, [fetchedSolicitudes, filteredSolicitudes, hasActiveFilters]);
+
 
   useEffect(() => {
     if (displayedSolicitudes && (user?.role === 'calificador' || user?.role === 'revisor' || user?.role === 'admin' || (user?.role === 'autorevisor_plus' && user.canReviewUserEmails && user.canReviewUserEmails.length > 0))) {
@@ -1200,6 +1256,11 @@ export default function DatabasePage() {
       setMessageText('');
     }
     setIsMessageDialogOpen(true);
+  };
+  
+  const openViewErrorDialog = (errorMessage: string) => {
+    setErrorMessageToView(errorMessage);
+    setIsViewErrorDialogOpen(true);
   };
 
   const handleSaveMessage = async () => {
@@ -1487,7 +1548,7 @@ export default function DatabasePage() {
 
   useEffect(() => {
     if (isClient && !authLoading) {
-      const isAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor' || user.role === 'admin' || user.role === 'autorevisor_plus');
+      const isAuthorized = user && (user.role === 'revisor' || user.role === 'calificador' || user.role === 'autorevisor' || user.role === 'admin' || user.role === 'autorevisor_plus' || user.role === 'recursosHumanos');
       if (!isAuthorized && !isDetailViewVisible) {
         if (!fetchedSolicitudes) {
           router.push('/');
@@ -1519,191 +1580,204 @@ export default function DatabasePage() {
 
     setIsLoading(true);
     setError(null);
-    setFetchedSolicitudes(null);
-    setDuplicateSets(new Map());
+    
+    if (!preserveFilters) {
+        setFetchedSolicitudes(null);
+        setCurrentSearchTermForDisplay('');
+        setIsDetailViewVisible(false);
+        setSolicitudToViewInline(null);
+        setDuplicateSets(new Map());
+        setResolvedDuplicateKeys([]);
+        // Reset filters only for a brand new search
+        setFilterEstadoSolicitudInput('');
+        setFilterEstadoPagoInput('');
+        setFilterEstadoPagoRHInput('');
+        setFilterRecpDocsInput('');
+        setFilterNotMinutaInput('');
+        setFilterSolicitudIdInput('');
+        setFilterFechaSolicitudInput('');
+        setFilterNEInput('');
+        setFilterMontoInput('');
+        setFilterConsignatarioInput('');
+        setFilterDeclaracionInput('');
+        setFilterReferenciaInput('');
+        if (user?.role !== 'autorevisor' && user?.role !== 'autorevisor_plus') {
+          setFilterGuardadoPorInput('');
+        }
+    } else {
+       setDuplicateSets(new Map());
+       setResolvedDuplicateKeys([]);
+    }
     setDuplicateFilterIds(null); 
-    if (!preserveFilters) {
-      setResolvedDuplicateKeys([]);
-    }
-    setCurrentSearchTermForDisplay('');
-    setIsDetailViewVisible(false);
-    setSolicitudToViewInline(null);
-
-    if (!preserveFilters) {
-      setFilterEstadoSolicitudInput('');
-      setFilterEstadoPagoInput('');
-      setFilterEstadoPagoRHInput('');
-      setFilterRecpDocsInput('');
-      setFilterNotMinutaInput('');
-      setFilterSolicitudIdInput('');
-      setFilterFechaSolicitudInput('');
-      setFilterNEInput('');
-      setFilterMontoInput('');
-      setFilterConsignatarioInput('');
-      setFilterDeclaracionInput('');
-      setFilterReferenciaInput('');
-      if (user?.role !== 'autorevisor' && user?.role !== 'autorevisor_plus') {
-        setFilterGuardadoPorInput('');
-      }
-    }
 
 
     const solicitudsCollectionRef = collection(db, "SolicitudCheques");
+    const memorandumsCollectionRef = collection(db, "Memorandum");
     let termForDisplay = searchTermText.trim();
-    const queryConstraints: QueryConstraint[] = [];
-
-    queryConstraints.push(orderBy("examDate", "desc"));
-
+    
+    const baseQueryConstraints: QueryConstraint[] = [orderBy("examDate", "desc")];
+    let queryConstraints: QueryConstraint[] = [...baseQueryConstraints];
+    let memoQueryConstraints: QueryConstraint[] = [...baseQueryConstraints];
+    
     if (user?.email) {
       if (user.role === 'autorevisor') {
         queryConstraints.push(where("savedBy", "==", user.email));
+        memoQueryConstraints.push(where("savedBy", "==", user.email));
       } else if (user.role === 'autorevisor_plus' && user.canReviewUserEmails && user.canReviewUserEmails.length > 0) {
         const emailsToQuery = [user.email, ...user.canReviewUserEmails];
         queryConstraints.push(where("savedBy", "in", emailsToQuery));
+        memoQueryConstraints.push(where("savedBy", "in", emailsToQuery));
       } else if (user.role === 'autorevisor_plus' && (!user.canReviewUserEmails || user.canReviewUserEmails.length === 0)) {
         queryConstraints.push(where("savedBy", "==", user.email));
+        memoQueryConstraints.push(where("savedBy", "==", user.email));
       }
     }
 
-
     try {
+      const setDateConstraints = (start: Date, end: Date) => {
+          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(start)), where("examDate", "<=", FirestoreTimestamp.fromDate(end)));
+          memoQueryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(start)), where("examDate", "<=", FirestoreTimestamp.fromDate(end)));
+      };
+
       switch (searchType) {
         case "dateToday":
-          const todayStart = startOfDay(new Date());
-          const todayEnd = endOfDay(new Date());
-          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(todayStart)));
-          queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(todayEnd)));
+          setDateConstraints(startOfDay(new Date()), endOfDay(new Date()));
           termForDisplay = format(new Date(), "PPP", { locale: es });
           break;
         case "dateCurrentMonth":
-          const monthStart = startOfMonth(new Date());
-          const monthEnd = endOfMonth(new Date());
-          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(monthStart)));
-          queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(monthEnd)));
+          setDateConstraints(startOfMonth(new Date()), endOfMonth(new Date()));
           termForDisplay = format(new Date(), "MMMM yyyy", { locale: es });
           break;
         case "dateSpecific":
           if (!selectedDate) { setError("Por favor, seleccione una fecha específica."); setIsLoading(false); return; }
-          const specificDayStart = startOfDay(selectedDate);
-          const specificDayEnd = endOfDay(selectedDate);
-          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(specificDayStart)));
-          queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(specificDayEnd)));
+          setDateConstraints(startOfDay(selectedDate), endOfDay(selectedDate));
           termForDisplay = format(selectedDate, "PPP", { locale: es });
           break;
         case "dateRange":
           if (!datePickerStartDate || !datePickerEndDate) { setError("Por favor, seleccione un rango de fechas (inicio y fin)."); setIsLoading(false); return; }
           if (datePickerStartDate > datePickerEndDate) { setError("La fecha de inicio no puede ser posterior a la fecha de fin."); setIsLoading(false); return; }
-          const rangeStart = startOfDay(datePickerStartDate);
-          const rangeEnd = endOfDay(datePickerEndDate);
-          queryConstraints.push(where("examDate", ">=", FirestoreTimestamp.fromDate(rangeStart)));
-          queryConstraints.push(where("examDate", "<=", FirestoreTimestamp.fromDate(rangeEnd)));
+          setDateConstraints(startOfDay(datePickerStartDate), endOfDay(datePickerEndDate));
           termForDisplay = `Rango: ${format(datePickerStartDate, "dd/MM/yy", { locale: es })} - ${format(datePickerEndDate, "dd/MM/yy", { locale: es })}`;
           break;
         default:
           setError("Tipo de búsqueda no válido."); setIsLoading(false); return;
       }
-
-      setCurrentSearchTermForDisplay(termForDisplay);
-
-      const q = query(solicitudsCollectionRef, ...queryConstraints);
       
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-        const dataPromises = querySnapshot.docs.map(async (docSnap) => {
-          const docData = docSnap.data();
-          const examDateValue = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : undefined);
-          const savedAtValue = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : undefined);
-          const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
-          const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
-          const emailMinutaLastUpdatedAt = docData.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? docData.emailMinutaLastUpdatedAt.toDate() : (docData.emailMinutaLastUpdatedAt instanceof Date ? docData.emailMinutaLastUpdatedAt : undefined);
-          const rhPaymentDate = docData.rhPaymentDate instanceof FirestoreTimestamp ? docData.rhPaymentDate.toDate() : (docData.rhPaymentDate instanceof Date ? docData.rhPaymentDate : undefined);
-          const rhPaymentStartDate = docData.rhPaymentStartDate instanceof FirestoreTimestamp ? docData.rhPaymentStartDate.toDate() : (docData.rhPaymentStartDate instanceof Date ? docData.rhPaymentStartDate : undefined);
-          const rhPaymentEndDate = docData.rhPaymentEndDate instanceof FirestoreTimestamp ? docData.rhPaymentEndDate.toDate() : (docData.rhPaymentEndDate instanceof Date ? docData.rhPaymentEndDate : undefined);
+      if (!preserveFilters) {
+        setCurrentSearchTermForDisplay(termForDisplay);
+      }
 
+      const qSolicitudes = query(solicitudsCollectionRef, ...queryConstraints);
+      const qMemorandums = query(memorandumsCollectionRef, ...memoQueryConstraints);
 
-          let commentsCount = 0;
-          try {
-            const collectionName = docData.isMemorandum ? "Memorandum" : "SolicitudCheques";
-            const commentsColRef = collection(db, collectionName, docSnap.id, "comments");
-            const commentsSnapshot = await getCountFromServer(commentsColRef);
-            commentsCount = commentsSnapshot.data().count;
-          } catch (countError) {
-            console.error(`Error fetching comments count for ${docSnap.id}: `, countError);
-          }
+      const [solicitudesSnapshot, memorandumsSnapshot] = await Promise.all([getDocs(qSolicitudes), getDocs(qMemorandums)]);
 
-          return {
-            ...docData,
-            solicitudId: docSnap.id,
-            examDate: examDateValue,
-            savedAt: savedAtValue,
-            paymentStatus: docData.paymentStatus || null,
-            paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
-            paymentStatusLastUpdatedBy: docData.paymentStatusLastUpdatedBy || null,
-            minutaNumber: docData.minutaNumber || null,
-            recepcionDCStatus: docData.recepcionDCStatus ?? false,
-            recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
-            recepcionDCLastUpdatedBy: docData.recepcionDCLastUpdatedBy || null,
-            emailMinutaStatus: docData.emailMinutaStatus ?? false,
-            emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
-            emailMinutaLastUpdatedBy: docData.emailMinutaLastUpdatedBy || null,
-            examNe: docData.examNe || '',
-            examReference: docData.examReference || null,
-            examManager: docData.examManager || '',
-            examRecipient: docData.examRecipient || '',
-            monto: docData.monto ?? null,
-            montoMoneda: docData.montoMoneda || null,
-            cantidadEnLetras: docData.cantidadEnLetras || null,
-            consignatario: docData.consignatario || null,
-            declaracionNumero: docData.declaracionNumero || null,
-            unidadRecaudadora: docData.unidadRecaudadora || null,
-            codigo1: docData.codigo1 || null,
-            codigo2: docData.codigo2 || null,
-            banco: docData.banco || null,
-            bancoOtros: docData.bancoOtros || null,
-            numeroCuenta: docData.numeroCuenta || null,
-            monedaCuenta: docData.monedaCuenta || null,
-            monedaCuentaOtros: docData.monedaCuentaOtros || null,
-            elaborarChequeA: docData.elaborarChequeA || null,
-            elaborarTransferenciaA: docData.elaborarTransferenciaA || null,
-            impuestosPagadosCliente: docData.impuestosPagadosCliente ?? false,
-            impuestosPagadosRC: docData.impuestosPagadosRC || null,
-            impuestosPagadosTB: docData.impuestosPagadosTB || null,
-            impuestosPagadosCheque: docData.impuestosPagadosCheque || null,
-            impuestosPendientesCliente: docData.impuestosPendientesCliente ?? false,
-            soporte: docData.soporte ?? false,
-            documentosAdjuntos: docData.documentosAdjuntos ?? false,
-            constanciasNoRetencion: docData.constanciasNoRetencion ?? false,
-            constanciasNoRetencion1: docData.constanciasNoRetencion1 ?? false,
-            constanciasNoRetencion2: docData.constanciasNoRetencion2 ?? false,
-            pagoServicios: docData.pagoServicios ?? false,
-            tipoServicio: docData.tipoServicio || null,
-            otrosTipoServicio: docData.otrosTipoServicio || null,
-            facturaServicio: docData.facturaServicio || null,
-            institucionServicio: docData.institucionServicio || null,
-            correo: docData.correo || null,
-            observation: docData.observation || null,
-            savedBy: docData.savedBy || null,
-            commentsCount: commentsCount,
-            hasOpenUrgentComment: docData.hasOpenUrgentComment ?? false,
-            isMemorandum: docData.isMemorandum ?? false,
-            memorandumCollaborators: docData.memorandumCollaborators || [],
-            rhPaymentStatus: docData.rhPaymentStatus || null,
-            rhPaymentOtherDetails: docData.rhPaymentOtherDetails || null,
-            rhPaymentDate: rhPaymentDate,
-            rhPaymentStartDate: rhPaymentStartDate,
-            rhPaymentEndDate: rhPaymentEndDate,
-            rhStatusLastUpdatedBy: docData.rhStatusLastUpdatedBy || null,
-            rhStatusLastUpdatedAt: docData.rhStatusLastUpdatedAt ? (docData.rhStatusLastUpdatedAt as FirestoreTimestamp).toDate() : undefined,
-          } as SolicitudRecord;
-        });
+      const mapDocToSolicitudRecord = async (docSnap: any): Promise<SolicitudRecord> => {
+            const docData = docSnap.data();
+            const collectionName = docSnap.ref.parent.id; // "SolicitudCheques" or "Memorandum"
 
-        const data = await Promise.all(dataPromises);
-        setFetchedSolicitudes(data);
+            const examDateValue = docData.examDate instanceof FirestoreTimestamp ? docData.examDate.toDate() : (docData.examDate instanceof Date ? docData.examDate : undefined);
+            const savedAtValue = docData.savedAt instanceof FirestoreTimestamp ? docData.savedAt.toDate() : (docData.savedAt instanceof Date ? docData.savedAt : undefined);
+            const paymentStatusLastUpdatedAt = docData.paymentStatusLastUpdatedAt instanceof FirestoreTimestamp ? docData.paymentStatusLastUpdatedAt.toDate() : (docData.paymentStatusLastUpdatedAt instanceof Date ? docData.paymentStatusLastUpdatedAt : undefined);
+            const recepcionDCLastUpdatedAt = docData.recepcionDCLastUpdatedAt instanceof FirestoreTimestamp ? docData.recepcionDCLastUpdatedAt.toDate() : (docData.recepcionDCLastUpdatedAt instanceof Date ? docData.recepcionDCLastUpdatedAt : undefined);
+            const emailMinutaLastUpdatedAt = docData.emailMinutaLastUpdatedAt instanceof FirestoreTimestamp ? docData.emailMinutaLastUpdatedAt.toDate() : (docData.emailMinutaLastUpdatedAt instanceof Date ? docData.emailMinutaLastUpdatedAt : undefined);
+            const rhPaymentDate = docData.rhPaymentDate instanceof FirestoreTimestamp ? docData.rhPaymentDate.toDate() : (docData.rhPaymentDate instanceof Date ? docData.rhPaymentDate : undefined);
+            const rhPaymentStartDate = docData.rhPaymentStartDate instanceof FirestoreTimestamp ? docData.rhPaymentStartDate.toDate() : (docData.rhPaymentStartDate instanceof Date ? docData.rhPaymentStartDate : undefined);
+            const rhPaymentEndDate = docData.rhPaymentEndDate instanceof FirestoreTimestamp ? docData.rhPaymentEndDate.toDate() : (docData.rhPaymentEndDate instanceof Date ? docData.rhPaymentEndDate : undefined);
 
-        if (data && data.length > 1) {
+            let commentsCount = 0;
+            try {
+              const commentsColRef = collection(db, collectionName, docSnap.id, "comments");
+              const commentsSnapshot = await getCountFromServer(commentsColRef);
+              commentsCount = commentsSnapshot.data().count;
+            } catch (countError) {
+              console.error(`Error fetching comments count for ${docSnap.id} in ${collectionName}: `, countError);
+            }
+
+            return {
+              ...docData,
+              solicitudId: docSnap.id,
+              examDate: examDateValue,
+              savedAt: savedAtValue,
+              paymentStatus: docData.paymentStatus || null,
+              paymentStatusLastUpdatedAt: paymentStatusLastUpdatedAt,
+              paymentStatusLastUpdatedBy: docData.paymentStatusLastUpdatedBy || null,
+              minutaNumber: docData.minutaNumber || null,
+              recepcionDCStatus: docData.recepcionDCStatus ?? false,
+              recepcionDCLastUpdatedAt: recepcionDCLastUpdatedAt,
+              recepcionDCLastUpdatedBy: docData.recepcionDCLastUpdatedBy || null,
+              emailMinutaStatus: docData.emailMinutaStatus ?? false,
+              emailMinutaLastUpdatedAt: emailMinutaLastUpdatedAt,
+              emailMinutaLastUpdatedBy: docData.emailMinutaLastUpdatedBy || null,
+              examNe: docData.examNe || '',
+              examReference: docData.examReference || null,
+              examManager: docData.examManager || '',
+              examRecipient: docData.examRecipient || '',
+              monto: docData.monto ?? null,
+              montoMoneda: docData.montoMoneda || null,
+              cantidadEnLetras: docData.cantidadEnLetras || null,
+              consignatario: docData.consignatario || null,
+              declaracionNumero: docData.declaracionNumero || null,
+              unidadRecaudadora: docData.unidadRecaudadora || null,
+              codigo1: docData.codigo1 || null,
+              codigo2: docData.codigo2 || null,
+              banco: docData.banco || null,
+              bancoOtros: docData.bancoOtros || null,
+              numeroCuenta: docData.numeroCuenta || null,
+              monedaCuenta: docData.monedaCuenta || null,
+              monedaCuentaOtros: docData.monedaCuentaOtros || null,
+              elaborarChequeA: docData.elaborarChequeA || null,
+              elaborarTransferenciaA: docData.elaborarTransferenciaA || null,
+              impuestosPagadosCliente: docData.impuestosPagadosCliente ?? false,
+              impuestosPagadosRC: docData.impuestosPagadosRC || null,
+              impuestosPagadosTB: docData.impuestosPagadosTB || null,
+              impuestosPagadosCheque: docData.impuestosPagadosCheque || null,
+              impuestosPendientesCliente: docData.impuestosPendientesCliente ?? false,
+              soporte: docData.soporte ?? false,
+              documentosAdjuntos: docData.documentosAdjuntos ?? false,
+              constanciasNoRetencion: docData.constanciasNoRetencion ?? false,
+              constanciasNoRetencion1: docData.constanciasNoRetencion1 ?? false,
+              constanciasNoRetencion2: docData.constanciasNoRetencion2 ?? false,
+              pagoServicios: docData.pagoServicios ?? false,
+              tipoServicio: docData.tipoServicio || null,
+              otrosTipoServicio: docData.otrosTipoServicio || null,
+              facturaServicio: docData.facturaServicio || null,
+              institucionServicio: docData.institucionServicio || null,
+              correo: docData.correo || null,
+              observation: docData.observation || null,
+              savedBy: docData.savedBy || null,
+              commentsCount: commentsCount,
+              hasOpenUrgentComment: docData.hasOpenUrgentComment ?? false,
+              isMemorandum: docData.isMemorandum ?? false,
+              memorandumCollaborators: docData.memorandumCollaborators || [],
+              rhPaymentStatus: docData.rhPaymentStatus || null,
+              rhPaymentOtherDetails: docData.rhPaymentOtherDetails || null,
+              rhPaymentDate: rhPaymentDate,
+              rhPaymentStartDate: rhPaymentStartDate,
+              rhPaymentEndDate: rhPaymentEndDate,
+              rhStatusLastUpdatedBy: docData.rhStatusLastUpdatedBy || null,
+              rhStatusLastUpdatedAt: docData.rhStatusLastUpdatedAt ? (docData.rhStatusLastUpdatedAt as FirestoreTimestamp).toDate() : undefined,
+            } as SolicitudRecord;
+        };
+
+      const dataPromises = [
+          ...solicitudesSnapshot.docs.map(mapDocToSolicitudRecord),
+          ...memorandumsSnapshot.docs.map(mapDocToSolicitudRecord)
+      ];
+      
+      const combinedData = await Promise.all(dataPromises);
+      combinedData.sort((a, b) => (b.examDate?.getTime() ?? 0) - (a.examDate?.getTime() ?? 0));
+
+      if (combinedData.length > 0) {
+        if (!preserveFilters) {
+            setFetchedSolicitudes(combinedData);
+        }
+
+        if (combinedData.length > 1) {
           const potentialDuplicatesMap = new Map<string, string[]>();
-          data.forEach(solicitud => {
-            if (solicitud.examNe && solicitud.examNe.trim() !== '' &&
+          combinedData.forEach(solicitud => {
+            if (!solicitud.isMemorandum && // Only check for duplicates in non-memorandum requests
+                solicitud.examNe && solicitud.examNe.trim() !== '' &&
                 solicitud.monto !== null &&
                 solicitud.montoMoneda && solicitud.montoMoneda.trim() !== '') {
               const key = `${solicitud.examNe.trim()}-${solicitud.monto}-${solicitud.montoMoneda.trim()}`;
@@ -1721,12 +1795,15 @@ export default function DatabasePage() {
             }
           });
           setDuplicateSets(newDuplicateSets);
-
         } else {
            setDuplicateSets(new Map());
         }
 
-      } else { setError("No se encontraron solicitudes para los criterios ingresados."); }
+      } else { 
+        if (!preserveFilters) {
+           setFetchedSolicitudes([]);
+        }
+      }
       
     } catch (err: any) {
       console.error("Error fetching documents from Firestore: ", err);
@@ -1765,14 +1842,14 @@ export default function DatabasePage() {
       "Constancias de No Retención", "Constancia 1%", "Constancia 2%",
       "Pago de Servicios", "Tipo de Servicio", "Otro Tipo de Servicio", "Factura Servicio", "Institución Servicio",
       "Correo Notificación", "Observación", "Usuario (De)",
-      "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)", "Actualizado Por (RH)", "Fecha Actualización (RH)", "Comentarios", "Comentario Urgente Abierto"
+      "Fecha de Guardado", "Actualizado Por (Pago)", "Fecha Actualización (Pago)", "Actualizado Por (RH)", "Fecha Actualización (RH)", "Comentarios", "Comentario Urgente Abierto", "Colaboradores"
     ];
 
     const dataToExportPromises = dataToUse.map(async (s) => {
       let commentsString = 'N/A';
+      const collectionName = s.isMemorandum ? "Memorandum" : "SolicitudCheques";
       if (s.commentsCount && s.commentsCount > 0) {
         try {
-            const collectionName = s.isMemorandum ? "Memorandum" : "SolicitudCheques";
             const commentsCollectionRef = collection(db, collectionName, s.solicitudId, "comments");
             const q = query(commentsCollectionRef, orderBy("createdAt", "asc"));
             const querySnapshot = await getDocs(q);
@@ -1784,7 +1861,7 @@ export default function DatabasePage() {
             }).join("\n");
             }
         } catch (err) {
-            console.error(`Error fetching comments for ${s.solicitudId}: `, err);
+            console.error(`Error fetching comments for ${s.solicitudId} from ${collectionName}: `, err);
             commentsString = 'Error al cargar comentarios';
         }
       } else if (s.commentsCount === 0) {
@@ -1797,7 +1874,8 @@ export default function DatabasePage() {
         'proceso_deduccion': 'En proceso de deducción',
         'otros': 'Otros',
       };
-
+      
+      const collaboratorsString = s.memorandumCollaborators?.map(c => `${c.name} (${c.number})`).join('; ') || 'N/A';
 
       return {
         "Estado de Pago": s.paymentStatus || 'Pendiente',
@@ -1823,7 +1901,6 @@ export default function DatabasePage() {
         "Declaracion": s.declaracionNumero || 'N/A',
         "Referencia": s.examReference || 'N/A',
         "Guardado Por": s.savedBy || 'N/A',
-
         "Cantidad en Letras": s.cantidadEnLetras || 'N/A',
         "Destinatario Solicitud": s.examRecipient,
         "Unidad Recaudadora": s.unidadRecaudadora || 'N/A',
@@ -1861,6 +1938,7 @@ export default function DatabasePage() {
         "Fecha Actualización (RH)": s.rhStatusLastUpdatedAt && s.rhStatusLastUpdatedAt instanceof Date ? format(s.rhStatusLastUpdatedAt, "yyyy-MM-dd HH:mm", { locale: es }) : 'N/A',
         "Comentarios": commentsString,
         "Comentario Urgente Abierto": s.hasOpenUrgentComment ? 'Sí' : 'No',
+        "Colaboradores": collaboratorsString,
       };
     });
 
@@ -1970,12 +2048,8 @@ export default function DatabasePage() {
                   <SelectContent>
                     <SelectItem value="dateToday">Por Fecha (Hoy)</SelectItem>
                     <SelectItem value="dateSpecific">Por Fecha (Específica)</SelectItem>
-                    {isUserAdminOrRevisor && (
-                        <SelectItem value="dateCurrentMonth">Por Mes (Actual)</SelectItem>
-                    )}
-                    {isUserCalificador && (
-                       <SelectItem value="dateRange">Por Rango de Fechas</SelectItem>
-                    )}
+                    <SelectItem value="dateCurrentMonth">Por Mes (Actual)</SelectItem>
+                    <SelectItem value="dateRange">Por Rango de Fechas</SelectItem>
                   </SelectContent>
                 </Select>
                 {renderSearchInputs()}
@@ -2003,8 +2077,15 @@ export default function DatabasePage() {
                 </p>
               </div>
             )}
+            
+            {hasActiveFilters && filteredSolicitudes && fetchedSolicitudes && filteredSolicitudes.length === 0 && (
+                <div className="mt-4 p-4 bg-yellow-500/10 text-yellow-700 border border-yellow-500/30 rounded-md text-center">
+                    Los filtros aplicados no encontraron coincidencias. Mostrando los resultados de la búsqueda original.
+                </div>
+            )}
 
-            {displayedSolicitudes && distinctPendingDocsCount > 5 && (
+
+            {displayedSolicitudes && displayedSolicitudes.length > 0 && distinctPendingDocsCount > 5 && (
               ((user?.role === 'calificador' || user?.role === 'admin') && ( 
                 <Card className="mt-4 mb-6 bg-amber-50 border border-amber-300 custom-shadow">
                   <CardHeader className="pb-3 pt-4">
@@ -2052,9 +2133,9 @@ export default function DatabasePage() {
             )}
 
             {isLoading && <div className="flex justify-center items-center py-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-3 text-muted-foreground">Cargando solicitudes...</p></div>}
-            {error && <div className="mt-4 p-4 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-center">{error}</div>}
+            {error && !isLoading && <div className="mt-4 p-4 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-center">{error}</div>}
             
-            {displayedSolicitudes && !isLoading &&
+            {fetchedSolicitudes && (filteredSolicitudes || fetchedSolicitudes).length > 0 && !isLoading &&
               <SearchResultsTable
                 solicitudes={displayedSolicitudes}
                 searchType={searchType}
@@ -2102,12 +2183,18 @@ export default function DatabasePage() {
                 onResolveDuplicate={handleResolveDuplicate}
                 resolvedDuplicateKeys={resolvedDuplicateKeys}
                 permanentlyResolvedDuplicateKeys={permanentlyResolvedDuplicateKeys}
+                onOpenViewErrorDialog={openViewErrorDialog}
               />
             }
             {!fetchedSolicitudes && !isLoading && !error && !currentSearchTermForDisplay && <div className="mt-4 p-4 bg-blue-500/10 text-blue-700 border border-blue-500/30 rounded-md text-center">Seleccione un tipo de búsqueda e ingrese los criterios para ver resultados.</div>}
             {fetchedSolicitudes && fetchedSolicitudes.length === 0 && !isLoading && !error && currentSearchTermForDisplay && (
                 <div className="mt-4 p-4 bg-yellow-500/10 text-yellow-700 border border-yellow-500/30 rounded-md text-center">
                     No se encontraron solicitudes para los criterios de búsqueda ingresados.
+                </div>
+            )}
+            {hasActiveFilters && filteredSolicitudes && fetchedSolicitudes && filteredSolicitudes.length === 0 && (
+                 <div className="mt-4 p-4 bg-yellow-500/10 text-yellow-700 border border-yellow-500/30 rounded-md text-center">
+                    Los filtros aplicados no encontraron coincidencias en la búsqueda actual. Se muestran los resultados de la búsqueda original.
                 </div>
             )}
           </CardContent>
@@ -2131,6 +2218,26 @@ export default function DatabasePage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsMessageDialogOpen(false); setMessageText(''); setCurrentSolicitudIdForMessage(null);}}>Salir</Button>
             <Button onClick={handleSaveMessage}>Guardar Mensaje</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isViewErrorDialogOpen} onOpenChange={setIsViewErrorDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mensaje de Error de la Solicitud</DialogTitle>
+            <DialogDescription>
+              El siguiente error fue registrado para esta solicitud.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={errorMessageToView}
+            readOnly
+            className="mt-2 bg-muted/50 cursor-not-allowed"
+            rows={4}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewErrorDialogOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2248,9 +2355,6 @@ export default function DatabasePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </AppShell>
   );
 }
-
-  
