@@ -52,7 +52,7 @@ const accountRegistryData: AccountRegistryEntry[] = [
 { id: "17", name: "Bomberos Banpro $", accountNumber: "10012403047675" },
 { id: "18", name: "TELCOR BAC C$", accountNumber: "000263756" },
 { id: "19", name: "TELCOR BAC $", accountNumber: "000263749" },
-{ id: "20", name: "Cuenta Principal C$", accountNumber: "00000000" },
+{ id: "20", name: "HA LOGISTIC DE CARGA NI Bancentro C$", accountNumber: "270200135" },
 { id: "21", name: "Cuenta Principal C$", accountNumber: "00000000" },
 { id: "22", name: "Cuenta Principal C$", accountNumber: "00000000" },
 { id: "23", name: "Cuenta Principal C$", accountNumber: "00000000" },
